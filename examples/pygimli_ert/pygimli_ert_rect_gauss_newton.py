@@ -3,7 +3,7 @@ import numpy as np
 import pygimli
 from pygimli.physics import ert
 from cofi import BaseProblem, InversionOptions, Inversion
-from cofi.solvers import BaseSolver
+from cofi.tools import BaseInferenceTool
 
 from pygimli_ert_lib import (
     survey_scheme,
@@ -72,7 +72,7 @@ ax[0].figure.savefig("figs/rect_mesh/rect_gauss_newton_rect_model_start")
 # pyGIMLi: An open-source library for modelling and inversion in geophysics,
 # https://doi.org/10.1016/j.cageo.2017.07.011.
 
-class GaussNewton(BaseSolver):
+class GaussNewton(BaseInferenceTool):
     def __init__(self, inv_problem, inv_options):
         __params = inv_options.get_params()
         self._niter = __params.get("niter", 100)

@@ -10,13 +10,7 @@ Calculating response for model: min = 50 max = 200
 Allocating memory for primary potential...... 0.003
 
 No primary potential for secondary field calculation. Calculating analytically...
-Factorize (Cholmod) matrix ... 0.006
-Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.005
-Factorize (Cholmod) matrix ... 0.004
-Factorize (Cholmod) matrix ... 0.004
-Factorize (Cholmod) matrix ... 0.005
-Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.005
 Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.004
@@ -25,6 +19,12 @@ Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.005
 Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.004
+Factorize (Cholmod) matrix ... 0.005
 Factorize (Cholmod) matrix ... 0.004
 Factorize (Cholmod) matrix ... 0.005
 Forward: time: 0.158s
