@@ -1,0 +1,7 @@
+notebook:
+  - title: fmm tomography
+    application domain: 37 Earth Sciences -> 3706 Geophysics -> 370602 Electrical And Electromagnetic Methods in Geophysics -> Direct Current And Induced Polarization
+    description: description 123blabla?
+    file_to_parse:
+      - pygimli_dcip_centrury_tri_mesh.ipynb
+      - pygimli_dcip.ipynb
