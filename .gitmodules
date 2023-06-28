@@ -1,0 +1,3 @@
+[submodule "examples/simpeg_skytem/bookpurnong-inversion"]
+	path = examples/simpeg_skytem/bookpurnong-inversion
+	url = https://github.com/simpeg-research/bookpurnong-inversion.git
