@@ -1,6 +1,6 @@
 notebook:
   - title: fmm tomography
-    application domain: 37 Earth Sciences -> 3706 Geophysics -> 370609 -> fast marching method tomography
+    application domain: 37 Earth Sciences -> 3706 Geophysics -> 370609 Seismology And Seismic Exploration -> fast marching method tomography
     description: description 123blabla?
     file_to_parse:
       - fmm_tomography.ipynb
