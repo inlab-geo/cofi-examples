@@ -23,9 +23,9 @@ fmm_problem = BaseProblem()
 fmm_problem.set_initial_model(ref_start_slowness)
 
 # add regularization: damping + flattening + smoothing
-damping_factor = 100
-flattening_factor = 0
-smoothing_factor = 1e4
+damping_factor = 0
+flattening_factor = 1e8
+smoothing_factor = 1e7
 reg_damping = damping_factor * QuadraticReg(
     model_shape=model_shape, 
     weighting_matrix="damping", 
@@ -74,14 +74,14 @@ fmm_problem.set_hessian(hessian)
 
 # Define CoFI InversionOptions
 inv_options = InversionOptions()
-inv_options.set_tool("cofi.simple_newton")
-inv_options.set_params(num_iterations=5, verbose=True, step_length=1)
+inv_options.set_tool("scipy.optimize.minimize")
+inv_options.set_params(method="Newton-CG", options={"xtol": 1e-12})
 
 # Define CoFI Inversion and run
 inv_newton = Inversion(fmm_problem, inv_options)
 inv_result_newton = inv_newton.run()
 ax = fmm.plot_model(inv_result_newton.model)
-ax.get_figure().savefig(f"figs/fmm_{int(damping_factor)}_{int(flattening_factor)}_{int(smoothing_factor)}_simple_newton")
+ax.get_figure().savefig(f"figs/fmm_{int(damping_factor)}_{int(flattening_factor)}_{int(smoothing_factor)}_scipy_optimiser")
 
 # Plot the true model
 ax2 = fmm.plot_model(fmm.good_model)
