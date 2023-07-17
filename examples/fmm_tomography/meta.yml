@@ -1,9 +1,14 @@
-notebook:
-  - title: fmm tomography
-    application domain: 37 Earth Sciences -> 3706 Geophysics -> 370609 Seismology And Seismic Exploration -> fast marching method tomography
-    description: description 123blabla?
-    file_to_parse:
-      - fmm_tomography.ipynb
+title: fmm tomography
+application domain: 37 Earth Sciences -> 3706 Geophysics -> 370609 Seismology And Seismic Exploration -> fast marching method tomography
+description: description 123blabla?
+method:
+  - fmm_tomography.ipynb:
+    - CoFI -> Ensemble Methods -> Bayesian Sampling -> MCMC Sampler -> EMCEE -> Affine Invariant Markov Chain Monte Carlo -> Stretch Move
+  - fmm_tomography_gaussian_prior_scipy_opt.py:
+    - CoFI -> Parameter Estimation -> Optimization -> Non-linear -> scipy.optimize.minimize -> Newton-CG
+  - fmm_tomography_simple_newton.py: 
+    - CoFI -> Ensemble Methods -> Bayesian Sampling -> MCMC Sampler -> EMCEE -> Affine Invariant Markov Chain Monte Carlo -> Stretch Move
+
       
 
 
