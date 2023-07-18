@@ -4,7 +4,7 @@ Summary for inversion problem: Polynomial Regression
 Model shape: (4,)
 ---------------------------------------------------------------------
 List of functions/properties set by you:
-['regularization', 'regularization_factor', 'forward', 'data', 'initial_model', 'model_shape']
+['regularization', 'forward', 'data', 'initial_model', 'model_shape']
 ---------------------------------------------------------------------
 List of functions/properties created based on what you have provided:
 ['objective', 'residual', 'data_misfit']
@@ -29,15 +29,15 @@ Summary for inversion result
 ============================
 SUCCESS
 ----------------------------
-fun: 15.12035433235976
-jac: [ 0.00000000e+00  2.38418579e-07 -4.76837158e-07  1.19209290e-07]
-hess_inv: [[ 0.09513707  0.02906813 -0.0408421  -0.01275489]
- [ 0.02906813  0.04336496 -0.01656499 -0.00906309]
- [-0.0408421  -0.01656499  0.02592322  0.00852057]
- [-0.01275489 -0.00906309  0.00852057  0.00338002]]
+fun: 16.217557592947745
+jac: [ 0.00000000e+00  2.38418579e-07 -4.76837158e-07 -2.38418579e-07]
+hess_inv: [[ 0.09466099  0.02886397 -0.0406164  -0.01267773]
+ [ 0.02886397  0.04324386 -0.01646474 -0.00902502]
+ [-0.0406164  -0.01646474  0.0258144   0.00848302]
+ [-0.01267773 -0.00902502  0.00848302  0.00336663]]
 nfev: 55
 njev: 11
 status: 0
 message: Optimization terminated successfully.
 nit: 8
-model: [-5.71767991 -5.10796278  1.8245948   0.97437582]
+model: [-5.68862266 -5.09203993  1.81066089  0.96922711]
