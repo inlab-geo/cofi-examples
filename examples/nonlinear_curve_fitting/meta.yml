@@ -1,0 +1,7 @@
+title: Non-linear Curve Fitting
+application domain: 49 MATHEMATICAL SCIENCES -> 4905 Statistics -> 490501 Applied statistics -> Curve fitting -> Non linear regression
+description: Non-linear curve fitting
+method:
+  nonlinear_curve_fitting.ipynb: 
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> lm
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
