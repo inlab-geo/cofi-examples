@@ -57,7 +57,7 @@ def objective_func(slowness):
 
 
 def gradient(slowness):
-    ttimes, A = fmm.forward(slowness, with_jacobian=True)
+    ttimes, A = fmm.forward(slowness, return_jacobian=True)
     data_misfit_grad = -2 * A.T @ (fmm.data - ttimes) / sigma**2
     model_reg_grad = reg.gradient(slowness)
     return data_misfit_grad + model_reg_grad
