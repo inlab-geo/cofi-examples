@@ -45,7 +45,7 @@ def chi_square(model_slowness, esp_fmm, Cd_inv):
 
 
 def gradient(model_slowness, esp_fmm, Cd_inv):
-    pred, jac = esp_fmm.forward(model_slowness, with_jacobian=True)
+    pred, jac = esp_fmm.forward(model_slowness, return_jacobian=True)
     residual = esp_fmm.data - pred
     model_diff = model_slowness - ref_start_slowness
     return -jac.T @ Cd_inv @ residual + gaussian_prior.gradient(model_slowness)
