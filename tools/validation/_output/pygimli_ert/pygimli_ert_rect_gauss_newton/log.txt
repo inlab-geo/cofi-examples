@@ -3,28 +3,28 @@ Found: 51 free-electrodes
 rMin = 0.5, rMax = 100
 NGauLeg + NGauLag for inverse Fouriertransformation: 13 + 4
 Found non-Neumann domain
-0.0129948 s
-FOP updating mesh dependencies ... 1.74e-06 s
+0.0127735 s
+FOP updating mesh dependencies ... 2.356e-06 s
 Obtaining geometric factors (analytical)
 Calculating response for model: min = 50 max = 200
-Allocating memory for primary potential...... 0.00307188
+Allocating memory for primary potential...... 0.00316076
 
 No primary potential for secondary field calculation. Calculating analytically...
-Forward: time: 0.178451s
+Forward: time: 0.174451s
 Response: min = 98.6119 max = 219.048 mean = 173.871
 Reciprocity rms(modelReciprocity) 0.408989%, max: 1.53118%
 relativeError set to a value > 0.5 .. assuming this is a percentage Error level dividing them by 100
 Data error estimate (min:max)  0.01000922975985971 : 0.22678548917843905
-Iteration #0, objective function value: 119.81024810154115
-Iteration #1, objective function value: 117.44450694954456
-Iteration #2, objective function value: 115.47873142667784
-Iteration #3, objective function value: 113.27633654766773
-Iteration #4, objective function value: 111.41518363149767
-Iteration #5, objective function value: 109.38308692378781
-Iteration #6, objective function value: 107.61947374393431
-Iteration #7, objective function value: 105.72788830121381
-Iteration #8, objective function value: 104.05017694878899
-Iteration #9, objective function value: 102.27771008814413
+Iteration #0, updated objective function value: 117.44450694954364
+Iteration #1, updated objective function value: 115.47873142667835
+Iteration #2, updated objective function value: 113.27633654766748
+Iteration #3, updated objective function value: 111.41518363150195
+Iteration #4, updated objective function value: 109.38308692378611
+Iteration #5, updated objective function value: 107.61947374393148
+Iteration #6, updated objective function value: 105.72788830121253
+Iteration #7, updated objective function value: 104.05017694878646
+Iteration #8, updated objective function value: 102.27771008813995
+Iteration #9, updated objective function value: 100.67972968392384
 ============================
 Summary for inversion result
 ============================
@@ -90,7 +90,7 @@ model: [5.36994762 5.35757265 5.33480383 5.30666311 5.28068914 5.2646159
  5.28650991 5.28592936 5.28260126 5.28340846 5.28750732 5.2884842
  5.27721866 5.26574744 5.25894489]
 num_iterations: 9
-objective_val: 100.67972968392448
-n_obj_evaluations: 10
+objective_val: 100.67972968392384
+n_obj_evaluations: 11
 n_grad_evaluations: 10
 n_hess_evaluations: 10

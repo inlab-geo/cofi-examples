@@ -1,0 +1,23 @@
+title: Linear Regression
+application domain: 49 MATHEMATICAL SCIENCES -> 4905 Statistics -> 490501 Applied statistics -> Curve fitting -> Linear regression
+description: Linear regression problem solved by linear solver, optimizer and sampler
+method:
+  linear_regression.ipynb:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+  linear_regression_sealevel.ipynb:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+  linear_regression_emcee_sampler.py:
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+  linear_regression_linear_system_solver.py:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+  linear_regression_linear_system_general.py:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+  linear_regression_optimizer_lstsq.py:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> trf
+  linear_regression_optimizer_minimize.py:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
+  linear_regression_pytorch_optim.py:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> Adam

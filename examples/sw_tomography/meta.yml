@@ -1,0 +1,6 @@
+title: Surface Wave Tomography via Seislib
+application domain: 37 EARTH SCIENCES -> 3706	Geophysics -> 370609 Seismology and seismic exploration -> Ambient noise -> Surface Wave Tomography
+description: We apply CoFI to measurements of surface-wave velocity collected across the USArray
+method:
+  sw_tomography.ipynb:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
