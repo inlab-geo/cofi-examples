@@ -10,3 +10,5 @@ method:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
   fmm_tomography_simple_newton.py: 
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
+  fmm_tomography_reg_scipy_optimiser.py:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
