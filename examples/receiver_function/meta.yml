@@ -1,5 +1,5 @@
 title: Receiver Function Inversion
-application domain: 37 EARTH SCIENCES -> 3706	Geophysics -> 370609 Seismology and seismic exploration -> Receiver function -> ReceiverFunctionInversion
+application domain: CoFI Examples -> 37 EARTH SCIENCES -> 3706 Geophysics -> 370609 Seismology and seismic exploration -> Receiver function -> ReceiverFunctionInversion
 description: We run inversion on a toy receiver function model with optimization and sampling in this example
 method:
   receiver_function_inversion.ipynb:

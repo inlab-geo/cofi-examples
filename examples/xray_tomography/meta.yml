@@ -1,5 +1,5 @@
 title: Xray Tomography
-application domain: 37 EARTH SCIENCES -> 3706 Geophysics -> 370609 Seismology And Seismic Exploration -> Xray Tracer -> Xray Tomography
+application domain: CoFI Examples -> 37 EARTH SCIENCES -> 3706 Geophysics -> 370609 Seismology and seismic exploration -> Xray Tracer -> Xray Tomography
 description: We look at a linear inverse problem based on Xray Tomography
 method:
   xray_tomography.ipynb:

@@ -1,5 +1,5 @@
 title: PyGIMLi ERT
-application domain: 37 EARTH SCIENCES -> 3706 Geophysics -> 370602 Electrical and electromagnetic methods in geophysics -> Electircal resistivity tomography -> ERT
+application domain: CoFI Examples -> 37 EARTH SCIENCES -> 3706 Geophysics -> 370602 Electrical and electromagnetic methods in geophysics -> Electircal resistivity tomography -> ERT
 description: Using the ERT solver provided by PyGIMLi, we use different CoFI solvers to solve the corresponding inverse problem
 method:
   pygimli_ert.ipynb: 
