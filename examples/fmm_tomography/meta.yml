@@ -1,5 +1,5 @@
 title: FMM Tomography
-application domain: 37 EARTH SCIENCES -> 3706	Geophysics -> 370609 Seismology and seismic exploration -> Fast Marching Method -> FMM tomography
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Travel times -> Non-linear tomography
 description: Seismic wave tomography via fast marching method
 method:
   fmm_tomography.ipynb:
