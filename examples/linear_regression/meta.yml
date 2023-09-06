@@ -1,5 +1,5 @@
 title: Linear Regression
-application domain: CoFI Examples -> 49 MATHEMATICAL SCIENCES -> 4905 Statistics -> 490501 Applied statistics -> Curve fitting -> Linear regression
+application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> tatistics -> Applied statistics -> Curve fitting -> Linear regression
 description: Linear regression problem solved by linear solver, optimizer and sampler
 method:
   linear_regression.ipynb:
