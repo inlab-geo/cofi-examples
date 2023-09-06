@@ -1,5 +1,9 @@
 title: Non-linear Curve Fitting
+<<<<<<< HEAD
 application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Statistics -> Applied statistics -> Curve fitting -> Non linear regression
+=======
+application domain: CoFI Examples -> 49 MATHEMATICAL SCIENCES -> 4905 Statistics -> 490501 Applied statistics -> Curve fitting -> Non linear regression
+>>>>>>> origin/main
 description: Non-linear curve fitting
 method:
   nonlinear_curve_fitting.ipynb: 
