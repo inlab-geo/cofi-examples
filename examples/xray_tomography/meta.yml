@@ -1,5 +1,5 @@
 title: Xray Tomography
-application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology And Seismic Exploration -> Travel times -> Straight-ray tomography
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Travel times -> Straight-ray tomography
 description: We look at a linear inverse problem based on Xray Tomography
 method:
   xray_tomography.ipynb:
