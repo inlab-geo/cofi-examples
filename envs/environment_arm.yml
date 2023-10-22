@@ -2,11 +2,14 @@ name: cofi_env
 channels:
   - conda-forge
   - defaults
+  - gimli
 dependencies:
   - python=3.9
   - jupyterlab>=3
   - matplotlib>=3.5.0
   - nodejs>=12
+  - pygimli>=1.4.0
+  - discretize>=0.7.0
   - shapely
   - cython
   - cartopy
@@ -17,3 +20,4 @@ dependencies:
     - ipywidgets>=7.7.0
     - tqdm>=4.0
     - seislib>=0.6.7
+    - SimPEG
