@@ -21,3 +21,4 @@ dependencies:
     - tqdm>=4.0
     - seislib>=0.6.7
     - SimPEG
+    - git+https://github.com/miili/pysurf96.git
