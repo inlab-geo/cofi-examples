@@ -1,5 +1,5 @@
 title: PyGIMLi DCIP
-application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical and electromagnetic methods in geophysics -> Electircal -> Direct current, induced polarization
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical and electromagnetic methods in geophysics -> Electrical -> Direct current, induced polarization
 description: Using the DCIP solver provided by PyGIMLi, we use different CoFI solvers to solve the corresponding inverse problem
 method:
   pygimli_dcip.ipynb: 
