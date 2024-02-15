@@ -23,7 +23,7 @@ ref_start_slowness = fmm.starting_model
 # define regularization (Gaussian Prior)
 corrx = 3.0
 corry = 3.0
-sigma_slowness = 0.002
+sigma_slowness = 0.002**2
 gaussian_prior = GaussianPrior(
     model_covariance_inv=((corrx, corry), sigma_slowness),
     mean_model=ref_start_slowness.reshape(model_shape)
