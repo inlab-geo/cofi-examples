@@ -1,0 +1,12 @@
+title: Surface wave dispersion and receiver function (joint inversion)
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Joint inversion -> Surface wave dispersion and receiver function
+description: We utlise CoFI to run optimsiation, fixed-dimensional sampling and trans-dimensional sampling on a joint inversion problem of surface wave dispersion and receiver function
+method:
+  surface_wave_receiver_function_joint.ipynb:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VannilaSampler
+  sw_rf_joint_synthetic.ipynb:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VannilaSampler
