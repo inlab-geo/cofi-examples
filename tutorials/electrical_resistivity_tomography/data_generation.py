@@ -24,6 +24,6 @@ data_err = data["rhoa"] * data["err"]
 data_err_log = np.log(data_err)
 data_cov_inv = np.eye(log_data.shape[0]) / (data_err_log ** 2)
 
-data.save("3_ert_data.dat")
-np.savetxt("3_ert_data_log.txt", log_data)
-np.savetxt("3_ert_data_cov_inv.txt", data_cov_inv)
+data.save("ert_data.dat")
+np.savetxt("ert_data_log.txt", log_data)
+np.savetxt("ert_data_cov_inv.txt", data_cov_inv)

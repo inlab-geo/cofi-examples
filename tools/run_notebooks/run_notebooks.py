@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # collect all examples & tutorials
     if sys.argv[-1] == "all":
         all_examples = glob(f"{EXAMPLES_DIR}/*/*.ipynb")
-        all_examples.extend(glob(f"{TUTORIALS_DIR}/*.ipynb"))
+        all_examples.extend(glob(f"{TUTORIALS_DIR}/*/*.ipynb"))
     else:
         all_examples = sys.argv[1:]
         all_examples = [file for file in all_examples if file.endswith(".ipynb")]
