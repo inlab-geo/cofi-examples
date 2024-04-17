@@ -18,7 +18,7 @@ Summary for inversion options
 Solving method: None set
 Use `suggest_solving_methods()` to check available solving methods.
 -----------------------------
-Backend tool: `<class 'cofi.tools._pytorch_optim.PyTorchOptim'>` - PyTorch Optimizers under module `pytorch.optim`
+Backend tool: `<class 'cofi.tools._pytorch_optim.PyTorchOptim'>` - PyTorch Optimizers under module `torch.optim`
 References: ['https://pytorch.org/docs/stable/optim.html#algorithms']
 Use `suggest_tools()` to check available backend tools.
 -----------------------------
