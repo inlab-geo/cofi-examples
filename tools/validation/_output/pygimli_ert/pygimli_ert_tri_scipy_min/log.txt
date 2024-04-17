@@ -3,13 +3,13 @@ Found: 51 free-electrodes
 rMin = 0.5, rMax = 100
 NGauLeg + NGauLag for inverse Fouriertransformation: 13 + 4
 Found non-Neumann domain
-0.0129769 s
-FOP updating mesh dependencies ... 2.442e-06 s
+0.0125049 s
+FOP updating mesh dependencies ... 1.689e-06 s
 Calculating response for model: min = 50 max = 200
-Allocating memory for primary potential...... 0.00317252
+Allocating memory for primary potential...... 0.00299152
 
 No primary potential for secondary field calculation. Calculating analytically...
-Forward: time: 0.165739s
+Forward: time: 0.162699s
 Response: min = 98.6119 max = 219.048 mean = 173.871
 Reciprocity rms(modelReciprocity) 0.408989%, max: 1.53118%
 relativeError set to a value > 0.5 .. assuming this is a percentage Error level dividing them by 100
@@ -19,7 +19,7 @@ Summary for inversion result
 FAILURE
 ----------------------------
 status: 1
-fun: 106.0043819338776
+fun: 106.00438193387768
 jac: [ 6.74219308e-02 -1.70666744e-02  5.78685615e-01  1.79634197e-01
   3.93222785e-01  5.07042866e-01  1.08500936e-01 -1.14920636e-02
   1.88326340e-01  8.09708753e-01  2.63974160e-01 -2.01253164e-02
@@ -53,7 +53,7 @@ jac: [ 6.74219308e-02 -1.70666744e-02  5.78685615e-01  1.79634197e-01
  -4.03048814e-03 -3.14476546e-02 -1.38170751e-03 -1.12483561e-03
  -2.14433595e-03 -2.01613464e-02 -6.14547197e-03 -1.77191012e-02
  -7.73053470e-03 -1.11966989e-02 -2.97305863e-02  2.17051864e-03
- -8.65946621e-03 -1.41984072e-02 -1.43001372e-02 -2.15801214e-02
+ -8.65946621e-03 -1.41984072e-02 -1.43001371e-02 -2.15801214e-02
  -1.19043653e-03 -4.17599750e-03 -2.61135556e-03 -6.18714199e-03
  -1.54216860e-02 -4.01541798e-03 -2.10358309e-02 -5.34008804e-03
  -2.31274124e-02 -6.31158506e-03 -2.28191145e-02  6.23840645e-03
