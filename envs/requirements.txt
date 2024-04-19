@@ -6,4 +6,4 @@ geo-espresso>=0.2.1.dev0
 tqdm>=4.0
 ipywidgets>=7.7.0
 seislib>=0.6.10
-git+https://github.com/miili/pysurf96.git
+git+https://github.com/inlab-geo/pysurf96.git
