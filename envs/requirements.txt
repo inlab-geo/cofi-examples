@@ -1,9 +1,10 @@
 jupyterlab>=3
 matplotlib>=3.5
-pygimli>=1.2.6
-cofi>=0.1.2.dev22
-geo-espresso>=0.2.1.dev0 
+pygimli>=1.5.0
+cofi>=0.2.8
+geo-espresso>=0.3.13
 tqdm>=4.0
 ipywidgets>=7.7.0
+cython
 seislib>=0.6.10
 git+https://github.com/inlab-geo/pysurf96.git
