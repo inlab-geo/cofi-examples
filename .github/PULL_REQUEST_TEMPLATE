@@ -1,0 +1,22 @@
+# CoFI Examples Pull Request Template
+
+## Description
+
+Please provide a clear and concise description of the changes you've made.
+
+Read the [Contributor's Guide](CONTRIBUTING.md) as a reference.
+
+## Type of Change
+
+Please indicate the type of change this pull request represents:
+
+- [ ] New CoFI example
+- [ ] Others (please specify here)
+
+## Requirements
+
+List any requirements or dependencies for running the example.
+
+## Additional Information
+
+Provide any additional information about how to run or context about the example here.
