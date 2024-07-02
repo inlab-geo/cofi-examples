@@ -418,7 +418,7 @@ def plot_plate_faces_single(fpt, option, forward, model, ax, **plotting_kwargs):
     else:
         ax.set_xlabel("inline (m)")
         ax.set_ylabel("elevation (m)")
-    if "x" in option:
+    if "x" in option and forward.n_transmitters > 1:
         tx_min = float("inf")
         tx_max = float("-inf")
         for i in range(forward.n_transmitters):
