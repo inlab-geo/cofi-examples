@@ -76,15 +76,15 @@ figure.savefig("inversion_pdip_single_transmitter_data.png")
 fig, axes = plt.subplots(2, 2, sharex="col", sharey="row")
 axes[1,1].axis("off")
 plot_plate_faces(
-    "plate_true", forward, problem_setup, true_param_value, 
+    "plate_true", forward, true_param_value, 
     axes[0,0], axes[0,1], axes[1,0], color="purple", label="true model"
 )
 plot_plate_faces(
-    "plate_inverted", forward, problem_setup, my_result.model, 
+    "plate_inverted", forward, my_result.model, 
     axes[0,0], axes[0,1], axes[1,0], color="red", label="inverted model", linestyle="dotted"
 )
 plot_plate_faces(
-    "plate_init", forward, problem_setup, init_param_value, 
+    "plate_init", forward, init_param_value, 
     axes[0,0], axes[0,1], axes[1,0], color="green", label="init model"
 )
 axes[0,0].legend()

@@ -16,7 +16,6 @@ problem_setup = {
     "cellw": 25,                                # cell width
     "pthk": numpy.array([1]),                   # plates thickness
     "plng": numpy.deg2rad(numpy.array([0])),    # plates plunge (orientation)
-    
 }
 
 
@@ -34,7 +33,7 @@ tx_min = 115
 tx_max = 281
 tx_interval = 15
 n_transmitters = (tx_max - tx_min - 1) // tx_interval + 1
-tx = numpy.arange(150, 240, 15)
+tx = numpy.arange(tx_min, tx_max, tx_interval)
 transmitters_setup = {
     "tx": tx,                                                   # transmitter easting/x-position
     "ty": numpy.array([100]*n_transmitters),                    # transmitter northing/y-position
@@ -51,7 +50,7 @@ transmitters_setup = {
 
 
 # ------- read survey data
-def read_gates_and_waveform(file_name="../LeroiAir.cfl") -> dict:
+def read_gates_and_waveform(file_name="LeroiAir.cfl") -> dict:
     with open(file_name) as f:
         lines = f.readlines()
     nsx=int(lines[2].split()[1])
@@ -167,7 +166,6 @@ class ForwardWrapper:
             if return_lengths:
                 return dpred, [len(d) for d in dpred_all]
         return dpred
-
     
     def _call_forward(self, pbres, failure_count, xmodl, model_dict, transmitter_setup):
         dpred = self.leroiair.formod_vtem_max_data(
@@ -262,23 +260,53 @@ def plot_data(model, forward, label, ax1=None, ax2=None, **kwargs):
                 _plot_data(x, current_data, vertical_returned, inline_returned, ax1, ax2, **kwargs)
             i += length
 
-def _plot_data(x, data, vertical_returned, inline_returned, ax1, ax2, **kwargs):
+def _plot_data(
+    x, 
+    data, 
+    vertical_returned, 
+    inline_returned, 
+    ax1, 
+    ax2, 
+    xlabel="mid time of gates", 
+    ylabel="(pT/s)", 
+    **kwargs
+):
     if vertical_returned and inline_returned:
         data = data.reshape(-1, 2)
+        data = numpy.exp(data)
         vertical = data[:,0]
         inline = data[:,1]
-        ax1.plot(x, vertical, **kwargs)
-        ax2.plot(x, inline, **kwargs)
-        ax1.set_xlabel("mid time of gates")
-        ax1.set_ylabel("(pT/s)")
-        ax2.set_xlabel("mid time of gates")
-        ax2.set_ylabel("(pT/s)")
+        ax1.loglog(x, vertical, **kwargs)
+        ax2.loglog(x, inline, **kwargs)
+        ax1.set_xlabel(xlabel)
+        ax1.set_ylabel(ylabel)
+        ax2.set_xlabel(xlabel)
+        ax2.set_ylabel(ylabel)
     else:
-        ax1.plot(x, data, **kwargs)
-        ax1.set_xlabel("mid time of gates")
-        ax1.set_ylabel("log of (pT/s)")
+        ax1.loglog(x, data, **kwargs)
+        ax1.set_xlabel(xlabel)
+        ax1.set_ylabel(ylabel)
 
-def gmt_plate_faces(fpt, forward, problem_setup, model):
+def plot_vertical_vs_horizontal_distance(model, forward, label, ax=None, **kwargs):
+    if forward.n_transmitters == 1:
+        raise ValueError("This function is only for multiple transmitters")
+    if ax is None:
+        _, ax = plt.subplots(1, 1)
+    x = numpy.array([forward.transmitters_setup[i]["tx"] for i in range(forward.n_transmitters)])
+    old_data_returned = forward.data_returned
+    forward.data_returned = ["vertical"]
+    data, data_lengths = forward(model, return_lengths=True)
+    for i in range(data_lengths[0]):
+        y = numpy.array([data[j] for j in range(i, len(data), data_lengths[0])])
+        if i == 0:
+            _plot_data(x, y, True, False, ax, None, 
+                       "horizontal distance (m)", "vertical component (fT)", label=label, **kwargs)
+        else:
+            _plot_data(x, y, True, False, ax, None, 
+                       "horizontal distance (m)", "vertical component (fT)", **kwargs)
+    forward.data_returned = old_data_returned
+
+def gmt_plate_faces(fpt, forward, problem_setup, model, surface_elevation=400):
     f = numpy.zeros([6, 4, 3])
     fh = open(fpt+'.xy', 'w')
     fh.close()
@@ -291,7 +319,7 @@ def gmt_plate_faces(fpt, forward, problem_setup, model):
 
     for i in range(problem_setup["nplt"]):
         f[:, :, :] = wrapper_geom.get_plate_faces_from_orientation(
-                model["peast"][i], model["pnorth"][i], model["ptop"][i], model["plngth1"][i],
+                model["peast"][i], model["pnorth"][i], surface_elevation-model["ptop"][i], model["plngth1"][i],
                 model["plngth2"][i], model["pwdth1"][i], model["pwdth2"][i],
                 problem_setup["pthk"][i], numpy.deg2rad(model["pdzm"][i]), numpy.deg2rad(model["pdip"][i]), 
                 numpy.deg2rad(problem_setup["plng"][i]))
@@ -332,7 +360,7 @@ def gmt_plate_faces(fpt, forward, problem_setup, model):
                 fh.write("{} {}\n".format(f[i, j, 2], f[i, j, 1]))
         fh.close()
 
-def plot_plate_face(full_fpth, forward, ax, cleanup=True, **plotting_kwargs):
+def plot_plate_face(full_fpth, forward, ax, cleanup=True, surface_elevation=400, **plotting_kwargs):
     with open(full_fpth, "r") as f:
         lines = f.readlines()
     lines = [l.strip() for l in lines]
@@ -350,20 +378,51 @@ def plot_plate_face(full_fpth, forward, ax, cleanup=True, **plotting_kwargs):
             ty = forward.transmitters_setup["ty"]
             ax.plot(tx, ty, "o", color="orange")
         else:
+            tx_min = float("inf")
+            tx_max = float("-inf")
             for i in range(forward.n_transmitters):
                 transmitter_setup = forward.transmitters_setup[i]
                 ax.plot(transmitter_setup["tx"], transmitter_setup["ty"], "o", color="orange")
-    if cleanup:
+                tx_min = min(tx_min, transmitter_setup["tx"])
+                tx_max = max(tx_max, transmitter_setup["tx"])
+            ax.set_xlim(tx_min-10, tx_max+10)
+    elif "xz" in full_fpth:
+        ax.axhline(surface_elevation, color="black", linestyle="--")
+    if cleanup == True:
         os.remove(full_fpth)
+    elif cleanup == "all":
+        for ext in [".xy", ".xz", ".zy"]:
+            os.remove(full_fpth[:-3] + ext)
 
-def plot_plate_faces(fpt, forward, problem_setup, model, ax1, ax2, ax3, **plotting_kwargs):
-    gmt_plate_faces(fpt, forward, problem_setup, model)
-    plot_plate_face(fpt+".xy", forward, ax1, **plotting_kwargs)
-    plot_plate_face(fpt+".zy", forward, ax2, **plotting_kwargs)
-    plot_plate_face(fpt+".xz", forward, ax3, **plotting_kwargs)
+def plot_plate_faces(fpt, forward, model, ax1, ax2, ax3, surface_elevation=400, **plotting_kwargs):
+    gmt_plate_faces(fpt, forward, forward.problem_setup, model, surface_elevation)
+    plot_plate_face(fpt+".xy", forward, ax1, True, surface_elevation, **plotting_kwargs)
+    plot_plate_face(fpt+".zy", forward, ax2, True, surface_elevation, **plotting_kwargs)
+    plot_plate_face(fpt+".xz", forward, ax3, True, surface_elevation, **plotting_kwargs)
     ax1.set_xlabel("inline (m)")
     ax1.set_ylabel("crossline (m)")
     ax2.set_xlabel("elevation (m)")
     ax2.set_ylabel("crossline (m)")
     ax3.set_xlabel("inline (m)")
     ax3.set_ylabel("elevation (m)")
+
+def plot_plate_faces_single(fpt, option, forward, model, ax, **plotting_kwargs):
+    gmt_plate_faces(fpt, forward, forward.problem_setup, model)
+    plot_plate_face(fpt+"."+option, forward, ax, "all", **plotting_kwargs)
+    if option == "xy":
+        ax.set_xlabel("inline (m)")
+        ax.set_ylabel("crossline (m)")
+    elif option == "zy":
+        ax.set_xlabel("elevation (m)")
+        ax.set_ylabel("crossline (m)")
+    else:
+        ax.set_xlabel("inline (m)")
+        ax.set_ylabel("elevation (m)")
+    if "x" in option and forward.n_transmitters > 1:
+        tx_min = float("inf")
+        tx_max = float("-inf")
+        for i in range(forward.n_transmitters):
+            tx = forward.transmitters_setup[i]["tx"]
+            tx_min = min(tx_min, tx)
+            tx_max = max(tx_max, tx)
+        ax.set_xlim(tx_min-10, tx_max+10)
