@@ -28,7 +28,7 @@ system_spec = {
     "ampt": 0,                                  # system spec: amplitude type AMPS 0
 }
 
-# ------- transmitter settings
+# ------- example transmitter settings
 tx_min = 115
 tx_max = 281
 tx_interval = 15
@@ -287,7 +287,7 @@ def _plot_data(
         ax1.set_xlabel(xlabel)
         ax1.set_ylabel(ylabel)
 
-def plot_vertical_vs_horizontal_distance(model, forward, label, ax=None, **kwargs):
+def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, ax=None, **kwargs):
     if forward.n_transmitters == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
@@ -296,11 +296,14 @@ def plot_vertical_vs_horizontal_distance(model, forward, label, ax=None, **kwarg
     old_data_returned = forward.data_returned
     forward.data_returned = ["vertical"]
     data, data_lengths = forward(model, return_lengths=True)
-    for i in range(data_lengths[0]):
+    lines_to_draw = range(data_lengths[0]) if data_idx is None else data_idx
+    labeled = False
+    for i in lines_to_draw:
         y = numpy.array([data[j] for j in range(i, len(data), data_lengths[0])])
-        if i == 0:
+        if not labeled:
             _plot_data(x, y, True, False, ax, None, 
                        "horizontal distance (m)", "vertical component (fT)", label=label, **kwargs)
+            labeled = True
         else:
             _plot_data(x, y, True, False, ax, None, 
                        "horizontal distance (m)", "vertical component (fT)", **kwargs)
@@ -388,6 +391,8 @@ def plot_plate_face(full_fpth, forward, ax, cleanup=True, surface_elevation=400,
             ax.set_xlim(tx_min-10, tx_max+10)
     elif "xz" in full_fpth:
         ax.axhline(surface_elevation, color="black", linestyle="--")
+    elif "zy" in full_fpth:
+        ax.axvline(surface_elevation, color="black", linestyle="--")
     if cleanup == True:
         os.remove(full_fpth)
     elif cleanup == "all":
