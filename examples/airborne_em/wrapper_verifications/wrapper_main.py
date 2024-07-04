@@ -237,7 +237,7 @@ class ForwardWrapper:
 
 
 # ------- wrap plotting functions
-def plot_data(model, forward, label, ax1=None, ax2=None, **kwargs):
+def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
     vertical_returned = "vertical" in forward.data_returned
     inline_returned = "inline" in forward.data_returned
     if ax1 is None:

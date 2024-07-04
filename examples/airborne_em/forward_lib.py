@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Set
 import joblib
 import os
 import numpy
@@ -11,7 +11,7 @@ import geom_lib
 # ------- problem setup
 problem_setup = {
     "nlyr": 2,                                  # number of layers (icl. halfspace)
-    "nstat": 1,                                 # numebr of fiducials/stations
+    "nstat": 1,                                 # number of fiducials/stations
     "nplt": 1,                                  # number of thin plates
     "cellw": 25,                                # cell width
     "pthk": numpy.array([1]),                   # plates thickness
@@ -103,7 +103,7 @@ class ForwardWrapper:
     
     def __init__(
         self, 
-        true_model: Dict[str, numpy.ndarray], 
+        sample_model_params: Dict[str, numpy.ndarray], 
         problem_setup: Dict[str, numpy.ndarray], 
         system_spec: Dict[str, numpy.ndarray],
         transmitters_setup: Dict[str, numpy.ndarray], 
@@ -111,7 +111,7 @@ class ForwardWrapper:
         params_to_invert: List[str] = None, 
         data_returned: List[str] = ["vertical", "inline"]
     ):
-        self.true_model = true_model
+        self.sample_model_params = sample_model_params
         self.problem_setup = problem_setup
         self.system_spec = system_spec
         self.survey_data = survey_data
@@ -127,10 +127,10 @@ class ForwardWrapper:
                 })
         
         if params_to_invert is None:
-            params_to_invert = sorted(self.true_model.keys())
+            params_to_invert = sorted(self.sample_model_params.keys())
         else:
             for p in params_to_invert:
-                if p not in self.true_model:
+                if p not in self.sample_model_params:
                     raise ValueError(f"Invalid parameter name: {p}")
         self.params_to_invert = sorted(params_to_invert)
         
@@ -173,7 +173,7 @@ class ForwardWrapper:
             leroiair_failure_count=failure_count,
             xmodl=xmodl,
             **model_dict,
-            **transmitter_setup, 
+            **{k: v for k, v in transmitter_setup.items() if "id" not in k}, 
             **self.survey_data,
             **self.problem_setup,
             **self.system_spec,
@@ -219,7 +219,7 @@ class ForwardWrapper:
         }
 
     def model_dict(self, model: numpy.ndarray) -> Dict[str, numpy.ndarray]:
-        model_dict = dict(self.true_model)
+        model_dict = dict(self.sample_model_params)
         i = 0
         for p in self.params_to_invert:
             try:
@@ -237,7 +237,7 @@ class ForwardWrapper:
 
 
 # ------- wrap plotting functions
-def plot_data(model, forward, label, ax1=None, ax2=None, **kwargs):
+def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
     vertical_returned = "vertical" in forward.data_returned
     inline_returned = "inline" in forward.data_returned
     if ax1 is None:
@@ -259,6 +259,20 @@ def plot_data(model, forward, label, ax1=None, ax2=None, **kwargs):
             else:
                 _plot_data(x, current_data, vertical_returned, inline_returned, ax1, ax2, **kwargs)
             i += length
+
+def plot_field_data(data_x, data_obs, label, ax, **kwargs):
+    if len(data_obs) != len(data_x):    # there are more than one transmitters
+        n_transmitters = len(data_obs) // len(data_x)
+        data_length = len(data_x)
+        for i in range(n_transmitters):
+            data_x_transmitter = data_x
+            data_obs_transmitter = data_obs[i*data_length:(i+1)*data_length]
+            if i == 0:
+                _plot_data(data_x_transmitter, data_obs_transmitter, True, False, ax, None, label=label, **kwargs)
+            else:
+                _plot_data(data_x_transmitter, data_obs_transmitter, True, False, ax, None, **kwargs)                
+    else:
+        _plot_data(data_x, data_obs, True, False, ax, None, label=label, **kwargs)
 
 def _plot_data(
     x, 
@@ -287,7 +301,7 @@ def _plot_data(
         ax1.set_xlabel(xlabel)
         ax1.set_ylabel(ylabel)
 
-def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, ax=None, **kwargs):
+def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, transmitter_line_id=None, ax=None, **kwargs):
     if forward.n_transmitters == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
@@ -296,10 +310,17 @@ def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, a
     old_data_returned = forward.data_returned
     forward.data_returned = ["vertical"]
     data, data_lengths = forward(model, return_lengths=True)
-    lines_to_draw = range(data_lengths[0]) if data_idx is None else data_idx
+    idx_to_draw = range(data_lengths[0]) if data_idx is None else data_idx
     labeled = False
-    for i in lines_to_draw:
+    if transmitter_line_id is not None:
+        idx_to_draw_line_id = [
+            i for i in range(forward.n_transmitters) if forward.transmitters_setup[i]["transmitter_line_id"] == transmitter_line_id
+        ]
+        x = x[idx_to_draw_line_id]
+    for i in idx_to_draw:
         y = numpy.array([data[j] for j in range(i, len(data), data_lengths[0])])
+        if transmitter_line_id is not None:
+            y = y[idx_to_draw_line_id]
         if not labeled:
             _plot_data(x, y, True, False, ax, None, 
                        "horizontal distance (m)", "vertical component (fT)", label=label, **kwargs)

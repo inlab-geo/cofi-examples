@@ -210,7 +210,7 @@ forward = ForwardWrapper(true_model, problem_setup, system_spec, survey_data)
 
 
 # ------- wrap plotting functions
-def plot_data(model, label, ax1=None, ax2=None, **kwargs):
+def plot_predicted_data(model, label, ax1=None, ax2=None, **kwargs):
     if ax1 is None:
         _, (ax1, ax2) = plt.subplots(1, 2)
     data = forward(model).reshape((2,-1))

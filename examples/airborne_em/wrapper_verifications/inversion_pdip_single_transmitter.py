@@ -64,9 +64,9 @@ print(my_result.model)
 
 # -------- plot data and inferred model
 figure, (ax1, ax2) = plt.subplots(1, 2)
-plot_data(true_param_value, forward, "data from true model", ax1, ax2, color="purple")
-plot_data(my_result.model, forward, "data from inverted model", ax1, ax2, color="red", linestyle="-.")
-plot_data(init_param_value, forward, "data from init model", ax1, ax2, color="green", linestyle=":")
+plot_predicted_data(true_param_value, forward, "data from true model", ax1, ax2, color="purple")
+plot_predicted_data(my_result.model, forward, "data from inverted model", ax1, ax2, color="red", linestyle="-.")
+plot_predicted_data(init_param_value, forward, "data from init model", ax1, ax2, color="green", linestyle=":")
 ax1.legend(loc="upper center")
 ax2.legend(loc="upper center")
 ax1.set_title("vertical")
