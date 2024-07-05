@@ -301,7 +301,7 @@ def _plot_data(
         ax1.set_xlabel(xlabel)
         ax1.set_ylabel(ylabel)
 
-def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, transmitter_line_id=None, ax=None, **kwargs):
+def plot_synth_vertical_vs_tx(model, forward, label, data_idx=None, transmitter_line_id=None, ax=None, **kwargs):
     if forward.n_transmitters == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
@@ -311,12 +311,12 @@ def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, t
     forward.data_returned = ["vertical"]
     data, data_lengths = forward(model, return_lengths=True)
     idx_to_draw = range(data_lengths[0]) if data_idx is None else data_idx
-    labeled = False
     if transmitter_line_id is not None:
         idx_to_draw_line_id = [
             i for i in range(forward.n_transmitters) if forward.transmitters_setup[i]["transmitter_line_id"] == transmitter_line_id
         ]
         x = x[idx_to_draw_line_id]
+    labeled = False
     for i in idx_to_draw:
         y = numpy.array([data[j] for j in range(i, len(data), data_lengths[0])])
         if transmitter_line_id is not None:
@@ -329,6 +329,30 @@ def plot_vertical_vs_horizontal_distance(model, forward, label, data_idx=None, t
             _plot_data(x, y, True, False, ax, None, 
                        "horizontal distance (m)", "vertical component (fT)", **kwargs)
     forward.data_returned = old_data_returned
+
+def plot_field_vertical_vs_tx(transmitters_setup, data_obs, label, data_idx=None, transmitter_line_id=None, ax=None, **kwargs):
+    if transmitters_setup["tx"].size == 1:
+        raise ValueError("This function is only for multiple transmitters")
+    if ax is None:
+        _, ax = plt.subplots(1, 1)
+    x = transmitters_setup["tx"]
+    data_length = data_obs.size // transmitters_setup["tx"].size
+    idx_to_draw = range(data_length) if data_idx is None else data_idx
+    if transmitter_line_id is not None:
+        id_to_draw_line_id = transmitters_setup["fiducial_id"][transmitters_setup["transmitter_line_id"] == transmitter_line_id]
+        x = x[id_to_draw_line_id]
+    labeled = False
+    for i in idx_to_draw:
+        y = numpy.array([data_obs[j] for j in range(i, len(data_obs), data_length)])
+        if transmitter_line_id is not None:
+            y = y[id_to_draw_line_id]
+        if not labeled:
+            _plot_data(x, y, True, False, ax, None, 
+                       "horizontal distance (m)", "vertical component (fT)", label=label, **kwargs)
+            labeled = True
+        else:
+            _plot_data(x, y, True, False, ax, None, 
+                       "horizontal distance (m)", "vertical component (fT)", **kwargs)
 
 def gmt_plate_faces(fpt, forward, problem_setup, model, surface_elevation=400):
     f = numpy.zeros([6, 4, 3])

@@ -287,7 +287,7 @@ def _plot_data(
         ax1.set_xlabel(xlabel)
         ax1.set_ylabel(ylabel)
 
-def plot_vertical_vs_horizontal_distance(model, forward, label, ax=None, **kwargs):
+def plot_synth_vertical_vs_tx(model, forward, label, ax=None, **kwargs):
     if forward.n_transmitters == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
