@@ -442,20 +442,15 @@ def plot_field_vertical_vs_tx(
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
         _, ax = plt.subplots(1, 1)
+    transmitters_setup, _, data_obs = get_subset_data_from_gateidx_n_lineid(
+        transmitters_setup, None, data_obs, gate_idx, transmitter_line_id
+    )
     x = transmitters_setup["tx"]
-    data_length = data_obs.size // x.size
-    idx_to_draw = range(data_length) if gate_idx is None else gate_idx
-    if transmitter_line_id is not None:
-        id_to_draw_line_id = transmitters_setup["fiducial_id"][
-            transmitters_setup["transmitter_line_id"] in transmitter_line_id
-        ]
-        x = x[id_to_draw_line_id]
-    labeled = False
-    for i in idx_to_draw:
-        y = numpy.array([data_obs[j] for j in range(i, len(data_obs), data_length)])
-        if transmitter_line_id is not None:
-            y = y[id_to_draw_line_id]
-        if not labeled:
+    n_gates = data_obs.size // x.size
+    labled = False
+    for i in range(n_gates):
+        y = data_obs[i::n_gates]
+        if not labled:
             _plot_data(
                 x,
                 y,
@@ -468,7 +463,7 @@ def plot_field_vertical_vs_tx(
                 label=label,
                 **kwargs,
             )
-            labeled = True
+            labled = True
         else:
             _plot_data(
                 x,
@@ -501,10 +496,13 @@ def get_subset_data_from_gateidx_n_lineid(
     new_transmitters_setup = {
         k: v[transmitter_idx] for k, v in transmitters_setup.items()
     }
-    new_survey_data = dict(survey_data)
-    new_survey_data["nchnl"] = len(gate_idx)
-    new_survey_data["topn"] = survey_data["topn"][gate_idx]
-    new_survey_data["tcls"] = survey_data["tcls"][gate_idx]
+    if survey_data is None:
+        new_survey_data = None
+    else:
+        new_survey_data = dict(survey_data)
+        new_survey_data["nchnl"] = len(gate_idx)
+        new_survey_data["topn"] = survey_data["topn"][gate_idx]
+        new_survey_data["tcls"] = survey_data["tcls"][gate_idx]
     new_data_obs = numpy.zeros(
         (
             len(transmitter_idx),
