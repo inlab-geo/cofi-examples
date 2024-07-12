@@ -1,4 +1,5 @@
-from typing import List, Dict, Set
+from typing import List, Dict
+import warnings
 import joblib
 import os
 import numpy
@@ -435,6 +436,7 @@ def plot_field_vertical_vs_tx(
     label,
     gate_idx: list = None,
     transmitter_line_id: list = None,
+    annotate_fiducial_id: bool = False,
     ax=None,
     **kwargs,
 ):
@@ -464,6 +466,9 @@ def plot_field_vertical_vs_tx(
                 **kwargs,
             )
             labled = True
+            if annotate_fiducial_id:
+                for j in range(0, x.size, 200):
+                    ax.annotate(str(transmitters_setup["fiducial_id"][j]), (x[j], y[j]), fontsize=8)
         else:
             _plot_data(
                 x,
@@ -477,22 +482,38 @@ def plot_field_vertical_vs_tx(
                 **kwargs,
             )
 
-
 def get_subset_data_from_gateidx_n_lineid(
-    transmitters_setup, survey_data, data_obs, gate_idx=None, transmitter_line_id=None
+    transmitters_setup,
+    survey_data,
+    data_obs,
+    gate_idx=None,
+    transmitter_line_id=None,
+    transmitter_fiducial_id=None,
 ):
     x = transmitters_setup["tx"]
     n_gates_total = data_obs.size // x.size
     data_obs = data_obs.reshape((x.size, n_gates_total))
     if gate_idx is None:
         gate_idx = range(n_gates_total)
-    if transmitter_line_id is None:
-        transmitter_line_id = list(set(transmitters_setup["transmitter_line_id"]))
-    transmitter_idx = [
-        i
-        for i in range(x.size)
-        if transmitters_setup["transmitter_line_id"][i] in transmitter_line_id
-    ]
+    if transmitter_fiducial_id is not None:
+        if transmitter_line_id is not None:
+            warnings.warn(
+                "Both transmitter_line_id and transmitter_fiducial_id are provided. "
+                "Using transmitter_fiducial_id."
+            )
+        transmitter_idx = [
+            i
+            for i in range(x.size)
+            if transmitters_setup["fiducial_id"][i] in transmitter_fiducial_id
+        ]
+    else:
+        if transmitter_line_id is None:
+            transmitter_line_id = list(set(transmitters_setup["transmitter_line_id"]))
+        transmitter_idx = [
+            i
+            for i in range(x.size)
+            if transmitters_setup["transmitter_line_id"][i] in transmitter_line_id
+        ]
     new_transmitters_setup = {
         k: v[transmitter_idx] for k, v in transmitters_setup.items()
     }
