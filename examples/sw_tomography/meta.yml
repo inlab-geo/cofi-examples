@@ -4,3 +4,4 @@ description: We apply CoFI to measurements of surface-wave velocity collected ac
 method:
   sw_tomography.ipynb:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler
