@@ -19,8 +19,7 @@ problem_setup = {
     "plng": numpy.deg2rad(numpy.array([0])),  # plates plunge (orientation)
 }
 
-
-# ------- system specification
+# ------- system specification with waveform and gates read from file
 system_spec = {
     "ncmp": 2,  # system spec: number of components
     "cmp": 2,  # system spec: active components
@@ -29,29 +28,29 @@ system_spec = {
     "ampt": 0,  # system spec: amplitude type AMPS 0
 }
 
-# ------- example transmitter settings
+# ------- example survey settings
 tx_min = 115
 tx_max = 281
 tx_interval = 15
-n_transmitters = (tx_max - tx_min - 1) // tx_interval + 1
+n_fiducials = (tx_max - tx_min - 1) // tx_interval + 1
 tx = numpy.arange(tx_min, tx_max, tx_interval)
-transmitters_setup = {
+survey_setup = {
     "tx": tx,  # transmitter easting/x-position
-    "ty": numpy.array([100] * n_transmitters),  # transmitter northing/y-position
-    "tz": numpy.array([50] * n_transmitters),  # transmitter height/z-position
-    "tazi": numpy.deg2rad(numpy.array([90] * n_transmitters)),  # transmitter azimuth
+    "ty": numpy.array([100] * n_fiducials),  # transmitter northing/y-position
+    "tz": numpy.array([50] * n_fiducials),  # transmitter height/z-position
+    "tazi": numpy.deg2rad(numpy.array([90] * n_fiducials)),  # transmitter azimuth
     "tincl": numpy.deg2rad(
-        numpy.array([6] * n_transmitters)
+        numpy.array([6] * n_fiducials)
     ),  # transmitter inclination
     "rx": tx,  # receiver easting/x-position
-    "ry": numpy.array([100] * n_transmitters),  # receiver northing/y-position
-    "rz": numpy.array([50] * n_transmitters),  # receiver height/z-position
-    "trdx": numpy.array([0] * n_transmitters),  # transmitter receiver separation inline
+    "ry": numpy.array([100] * n_fiducials),  # receiver northing/y-position
+    "rz": numpy.array([50] * n_fiducials),  # receiver height/z-position
+    "trdx": numpy.array([0] * n_fiducials),  # transmitter receiver separation inline
     "trdy": numpy.array(
-        [0] * n_transmitters
+        [0] * n_fiducials
     ),  # transmitter receiver separation crossline
     "trdz": numpy.array(
-        [0] * n_transmitters
+        [0] * n_fiducials
     ),  # transmitter receiver separation vertical
 }
 
@@ -78,20 +77,13 @@ def read_gates_and_waveform(file_name="LeroiAir.cfl") -> dict:
     waveform = numpy.array(waveform)
     topn = numpy.array(topn)
     tcls = numpy.array(tcls)
-    return {
-        "nsx": nsx,
-        "nchnl": nchnl,
-        "swx": swx,
-        "waveform": waveform,
-        "topn": topn,
-        "tcls": tcls,
-    }
+    return {"nsx": nsx,"swx": swx,"waveform": waveform},{"nchnl": nchnl,"topn": topn,"tcls": tcls}
 
 
 # (topn + tcls) / 2
-
-survey_data = read_gates_and_waveform()
-
+[gates,waveform] = read_gates_and_waveform()
+system_spec.update(gates)
+system_spec.update(waveform)
 
 # ------- define true model
 true_model = {
@@ -118,24 +110,24 @@ class ForwardWrapper:
         sample_model_params: Dict[str, numpy.ndarray],
         problem_setup: Dict[str, numpy.ndarray],
         system_spec: Dict[str, numpy.ndarray],
-        transmitters_setup: Dict[str, numpy.ndarray],
-        survey_data: Dict[str, numpy.ndarray],
+        survey_setup: Dict[str, numpy.ndarray],
         params_to_invert: List[str] = None,
         data_returned: List[str] = ["vertical", "inline"],
     ):
         self.sample_model_params = sample_model_params
         self.problem_setup = problem_setup
         self.system_spec = system_spec
-        self.survey_data = survey_data
 
-        self.n_transmitters = transmitters_setup["tx"].size
-        if self.n_transmitters == 1:
-            self.transmitters_setup = transmitters_setup
+        print(params_to_invert)
+
+        self.n_fiducials = survey_setup["tx"].size
+        if self.n_fiducials == 1:
+            self.survey_setup = survey_setup
         else:
-            self.transmitters_setup = []
-            for i in range(self.n_transmitters):
-                self.transmitters_setup.append(
-                    {k: numpy.array([v[i]]) for k, v in transmitters_setup.items()}
+            self.survey_setup = []
+            for i in range(self.n_fiducials):
+                self.survey_setup.append(
+                    {k: numpy.array([v[i]]) for k, v in survey_setup.items()}
                 )
 
         if params_to_invert is None:
@@ -165,44 +157,45 @@ class ForwardWrapper:
     def __call__(
         self, model: numpy.ndarray, return_lengths: bool = False
     ) -> numpy.ndarray:
+        
         model_dict = self.model_dict(model)
+        #model_dict=model
         model_dict = {
             k: numpy.deg2rad(v) if k in ["pdzm", "pdip"] else v
             for k, v in model_dict.items()
         }
         pbres = model_dict["res"][-1]
         leroiair_failure_count = 0
-        xmodl = numpy.zeros([self.survey_data["nchnl"] * self.system_spec["ncmp"]])
-        if self.n_transmitters == 1:
+        xmodl = numpy.zeros([self.system_spec["nchnl"] * self.system_spec["ncmp"]])
+        if self.n_fiducials == 1:
             dpred = self._call_forward(
                 pbres,
                 leroiair_failure_count,
                 xmodl,
                 model_dict,
-                self.transmitters_setup,
+                self.survey_setup,
             )
         else:
             # https://joblib.readthedocs.io/en/stable/parallel.html#thread-based-parallelism-vs-process-based-parallelism
             # calling compiled extension so using `prefer="threads"`
-            dpred_all = joblib.Parallel(n_jobs=self.n_transmitters, prefer="threads")(
+            dpred_all = joblib.Parallel(n_jobs=self.n_fiducials, prefer="threads")(
                 joblib.delayed(self._call_forward)(
-                    pbres, leroiair_failure_count, xmodl, model_dict, transmitter_setup
+                    pbres, leroiair_failure_count, xmodl, model_dict, survey_setup
                 )
-                for transmitter_setup in self.transmitters_setup
+                for survey_setup in self.survey_setup
             )
             dpred = numpy.concatenate(dpred_all)
             if return_lengths:
                 return dpred, [len(d) for d in dpred_all]
         return dpred
 
-    def _call_forward(self, pbres, failure_count, xmodl, model_dict, transmitter_setup):
+    def _call_forward(self, pbres, failure_count, xmodl, model_dict, survey_setup):
         dpred = self.leroiair.formod_vtem_max_data(
             pbres=pbres,
             leroiair_failure_count=failure_count,
             xmodl=xmodl,
             **model_dict,
-            **{k: v for k, v in transmitter_setup.items() if "id" not in k},
-            **self.survey_data,
+            **{k: v for k, v in survey_setup.items() if "id" not in k},
             **self.problem_setup,
             **self.system_spec,
         )
@@ -248,6 +241,7 @@ class ForwardWrapper:
 
     def model_dict(self, model: numpy.ndarray) -> Dict[str, numpy.ndarray]:
         model_dict = dict(self.sample_model_params)
+
         i = 0
         for p in self.params_to_invert:
             try:
@@ -273,8 +267,8 @@ def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
             _, (ax1, ax2) = plt.subplots(1, 2)
         else:
             _, ax1 = plt.subplots(1, 1)
-    x = (forward.survey_data["topn"] + forward.survey_data["tcls"]) / 2
-    if forward.n_transmitters == 1:
+    x = (forward.system_spec["topn"] + forward.system_spec["tcls"]) / 2
+    if forward.n_fiducials == 1:
         data = forward(model)
         _plot_data(
             x, data, vertical_returned, inline_returned, ax1, ax2, label=label, **kwargs
@@ -310,9 +304,9 @@ def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
 
 def plot_field_data(data_x, data_obs, label, ax, **kwargs):
     if len(data_obs) != len(data_x):  # there are more than one transmitters
-        n_transmitters = len(data_obs) // len(data_x)
+        n_fiducials = len(data_obs) // len(data_x)
         data_length = len(data_x)
-        for i in range(n_transmitters):
+        for i in range(n_fiducials):
             data_x_transmitter = data_x
             data_obs_transmitter = data_obs[i * data_length : (i + 1) * data_length]
             if i == 0:
@@ -373,33 +367,33 @@ def plot_synth_vertical_vs_tx(
     forward,
     label,
     gate_idx: list = None,
-    transmitter_line_id: list = None,
+    line_id: list = None,
     ax=None,
     **kwargs,
 ):
-    if forward.n_transmitters == 1:
+    if forward.n_fiducials == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
         _, ax = plt.subplots(1, 1)
     x = numpy.array(
-        [forward.transmitters_setup[i]["tx"] for i in range(forward.n_transmitters)]
+        [forward.survey_setup[i]["tx"] for i in range(forward.n_fiducials)]
     )
     old_data_returned = forward.data_returned
     forward.data_returned = ["vertical"]
     data, data_lengths = forward(model, return_lengths=True)
     idx_to_draw = range(data_lengths[0]) if gate_idx is None else gate_idx
-    if transmitter_line_id is not None:
+    if line_id is not None:
         idx_to_draw_line_id = [
             i
-            for i in range(forward.n_transmitters)
-            if forward.transmitters_setup[i]["transmitter_line_id"]
-            in transmitter_line_id
+            for i in range(forward.n_fiducials)
+            if forward.survey_setup[i]["line_id"]
+            in line_id
         ]
         x = x[idx_to_draw_line_id]
     labeled = False
     for i in idx_to_draw:
         y = numpy.array([data[j] for j in range(i, len(data), data_lengths[0])])
-        if transmitter_line_id is not None:
+        if line_id is not None:
             y = y[idx_to_draw_line_id]
         if not labeled:
             _plot_data(
@@ -431,23 +425,23 @@ def plot_synth_vertical_vs_tx(
 
 
 def plot_field_vertical_vs_tx(
-    transmitters_setup,
+    survey_setup,
     data_obs,
     label,
     gate_idx: list = None,
-    transmitter_line_id: list = None,
+    line_id: list = None,
     annotate_fiducial_id: bool = False,
     ax=None,
     **kwargs,
 ):
-    if transmitters_setup["tx"].size == 1:
+    if survey_setup["tx"].size == 1:
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
         _, ax = plt.subplots(1, 1)
-    transmitters_setup, _, data_obs = get_subset_data_from_gateidx_n_lineid(
-        transmitters_setup, None, data_obs, gate_idx, transmitter_line_id
+    survey_setup, _, data_obs = get_subset_data_from_gateidx_n_lineid(
+        survey_setup, None, data_obs, gate_idx, line_id
     )
-    x = transmitters_setup["tx"]
+    x = survey_setup["tx"]
     n_gates = data_obs.size // x.size
     labled = False
     for i in range(n_gates):
@@ -468,7 +462,7 @@ def plot_field_vertical_vs_tx(
             labled = True
             if annotate_fiducial_id:
                 for j in range(0, x.size, 200):
-                    ax.annotate(str(transmitters_setup["fiducial_id"][j]), (x[j], y[j]), fontsize=8)
+                    ax.annotate(str(survey_setup["fiducial_id"][j]), (x[j], y[j]), fontsize=8)
         else:
             _plot_data(
                 x,
@@ -483,39 +477,39 @@ def plot_field_vertical_vs_tx(
             )
 
 def get_subset_data_from_gateidx_n_lineid(
-    transmitters_setup,
+    survey_setup,
     survey_data,
     data_obs,
     gate_idx=None,
-    transmitter_line_id=None,
+    line_id=None,
     transmitter_fiducial_id=None,
 ):
-    x = transmitters_setup["tx"]
+    x = survey_setup["tx"]
     n_gates_total = data_obs.size // x.size
     data_obs = data_obs.reshape((x.size, n_gates_total))
     if gate_idx is None:
         gate_idx = range(n_gates_total)
     if transmitter_fiducial_id is not None:
-        if transmitter_line_id is not None:
+        if line_id is not None:
             warnings.warn(
-                "Both transmitter_line_id and transmitter_fiducial_id are provided. "
+                "Both line_id and transmitter_fiducial_id are provided. "
                 "Using transmitter_fiducial_id."
             )
         transmitter_idx = [
             i
             for i in range(x.size)
-            if transmitters_setup["fiducial_id"][i] in transmitter_fiducial_id
+            if survey_setup["fiducial_id"][i] in transmitter_fiducial_id
         ]
     else:
-        if transmitter_line_id is None:
-            transmitter_line_id = list(set(transmitters_setup["transmitter_line_id"]))
+        if line_id is None:
+            line_id = list(set(survey_setup["line_id"]))
         transmitter_idx = [
             i
             for i in range(x.size)
-            if transmitters_setup["transmitter_line_id"][i] in transmitter_line_id
+            if survey_setup["line_id"][i] in line_id
         ]
-    new_transmitters_setup = {
-        k: v[transmitter_idx] for k, v in transmitters_setup.items()
+    new_survey_setup = {
+        k: v[transmitter_idx] for k, v in survey_setup.items()
     }
     if survey_data is None:
         new_survey_data = None
@@ -533,7 +527,7 @@ def get_subset_data_from_gateidx_n_lineid(
     for i, idx in enumerate(gate_idx):
         new_data_obs[:, i] = data_obs[transmitter_idx, idx]
     new_data_obs = new_data_obs.flatten()
-    return new_transmitters_setup, new_survey_data, new_data_obs
+    return new_survey_setup, new_survey_data, new_data_obs
 
 
 def gmt_plate_faces(fpt, forward, problem_setup, model, surface_elevation=400):
@@ -614,28 +608,29 @@ def plot_plate_face(
         else:
             ax.plot(x, y, **plotting_kwargs)
     if "xy" in full_fpth:
-        if forward.n_transmitters == 1:
-            tx = forward.transmitters_setup["tx"]
-            ty = forward.transmitters_setup["ty"]
+        if forward.n_fiducials == 1:
+            tx = forward.survey_setup["tx"]
+            ty = forward.survey_setup["ty"]
             ax.plot(tx, ty, "o", color="orange")
         else:
             tx_min = float("inf")
             tx_max = float("-inf")
-            for i in range(forward.n_transmitters):
-                transmitter_setup = forward.transmitters_setup[i]
+            for i in range(forward.n_fiducials):
+                survey_setup = forward.survey_setup[i]
                 ax.plot(
-                    transmitter_setup["tx"],
-                    transmitter_setup["ty"],
+                    survey_setup["tx"],
+                    survey_setup["ty"],
                     "o",
                     color="orange",
                 )
-                tx_min = min(tx_min, transmitter_setup["tx"])
-                tx_max = max(tx_max, transmitter_setup["tx"])
+                tx_min = min(tx_min, survey_setup["tx"])
+                tx_max = max(tx_max, survey_setup["tx"])
             ax.set_xlim(tx_min - 10, tx_max + 10)
     elif "xz" in full_fpth:
         ax.axhline(surface_elevation, color="black", linestyle="--")
     elif "zy" in full_fpth:
         ax.axvline(surface_elevation, color="black", linestyle="--")
+        ax.invert_xaxis()
     if cleanup == True:
         os.remove(full_fpth)
     elif cleanup == "all":
@@ -676,11 +671,11 @@ def plot_plate_faces_single(fpt, option, forward, model, ax, **plotting_kwargs):
     else:
         ax.set_xlabel("inline (m)")
         ax.set_ylabel("elevation (m)")
-    if "x" in option and forward.n_transmitters > 1:
+    if "x" in option and forward.n_fiducials > 1:
         tx_min = float("inf")
         tx_max = float("-inf")
-        for i in range(forward.n_transmitters):
-            tx = forward.transmitters_setup[i]["tx"]
+        for i in range(forward.n_fiducials):
+            tx = forward.survey_setup[i]["tx"]
             tx_min = min(tx_min, tx)
             tx_max = max(tx_max, tx)
         ax.set_xlim(tx_min - 10, tx_max + 10)
