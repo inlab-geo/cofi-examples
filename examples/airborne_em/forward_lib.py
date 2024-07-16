@@ -258,6 +258,18 @@ class ForwardWrapper:
         return numpy.concatenate([model[p] for p in self.params_to_invert])
 
 
+
+def get_subset_data_in_rectangle():
+	pass
+
+
+def get_closest_fiducial():
+	pass
+
+def plot_survey_map(survey_setup):
+ 	_, ax = plt.subplots(1, 1)
+ 	ax.plot(survey_setup['tx'],survey_setup['ty'],'.r')
+
 # ------- wrap plotting functions
 def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
     vertical_returned = "vertical" in forward.data_returned
