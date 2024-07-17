@@ -66,7 +66,7 @@ def read_gates_and_waveform(file_name="LeroiAir.cfl") -> dict:
     for i in range(nsx):
         fields = lines[3 + i].split()
         swx.append(float(fields[0]) / 1000.0)
-        waveform.append(fields[1])
+        waveform.append(float(fields[1]))
     topn = []
     tcls = []
     for i in range(nchnl):
@@ -259,16 +259,13 @@ class ForwardWrapper:
 
 
 
-def get_subset_data_in_rectangle():
-	pass
-
-
-def get_closest_fiducial():
-	pass
-
 def plot_survey_map(survey_setup):
- 	_, ax = plt.subplots(1, 1)
- 	ax.plot(survey_setup['tx'],survey_setup['ty'],'.r')
+    _, ax = plt.subplots(1, 1)
+    ax.plot(survey_setup['tx'],survey_setup['ty'],'.r')
+    
+    for i, txt in enumerate(survey_setup['fiducial_id']):
+        if i%100==0:
+            ax.annotate(txt, (survey_setup['tx'][i], survey_setup['ty'][i]))
 
 # ------- wrap plotting functions
 def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
@@ -450,7 +447,7 @@ def plot_field_vertical_vs_tx(
         raise ValueError("This function is only for multiple transmitters")
     if ax is None:
         _, ax = plt.subplots(1, 1)
-    survey_setup, _, data_obs = get_subset_data_from_gateidx_n_lineid(
+    survey_setup, _, data_obs = get_subset_of_survey(
         survey_setup, None, data_obs, gate_idx, line_id
     )
     x = survey_setup["tx"]
@@ -488,29 +485,29 @@ def plot_field_vertical_vs_tx(
                 **kwargs,
             )
 
-def get_subset_data_from_gateidx_n_lineid(
+def get_subset_of_survey(
     survey_setup,
-    survey_data,
+    system_spec,
     data_obs,
     gate_idx=None,
     line_id=None,
-    transmitter_fiducial_id=None,
+    fiducial_id=None,
 ):
     x = survey_setup["tx"]
     n_gates_total = data_obs.size // x.size
     data_obs = data_obs.reshape((x.size, n_gates_total))
     if gate_idx is None:
         gate_idx = range(n_gates_total)
-    if transmitter_fiducial_id is not None:
+    if fiducial_id is not None:
         if line_id is not None:
             warnings.warn(
-                "Both line_id and transmitter_fiducial_id are provided. "
-                "Using transmitter_fiducial_id."
+                "Both line_id and fiducial_id are provided. "
+                "Using fiducial_id."
             )
         transmitter_idx = [
             i
             for i in range(x.size)
-            if survey_setup["fiducial_id"][i] in transmitter_fiducial_id
+            if survey_setup["fiducial_id"][i] in fiducial_id
         ]
     else:
         if line_id is None:
@@ -523,13 +520,13 @@ def get_subset_data_from_gateidx_n_lineid(
     new_survey_setup = {
         k: v[transmitter_idx] for k, v in survey_setup.items()
     }
-    if survey_data is None:
-        new_survey_data = None
+    if system_spec is None:
+        new_system_spec = None
     else:
-        new_survey_data = dict(survey_data)
-        new_survey_data["nchnl"] = len(gate_idx)
-        new_survey_data["topn"] = survey_data["topn"][gate_idx]
-        new_survey_data["tcls"] = survey_data["tcls"][gate_idx]
+        new_system_spec = dict(system_spec)
+        new_system_spec["nchnl"] = len(gate_idx)
+        new_system_spec["topn"] = system_spec["topn"][gate_idx]
+        new_system_spec["tcls"] = system_spec["tcls"][gate_idx]
     new_data_obs = numpy.zeros(
         (
             len(transmitter_idx),
@@ -539,7 +536,7 @@ def get_subset_data_from_gateidx_n_lineid(
     for i, idx in enumerate(gate_idx):
         new_data_obs[:, i] = data_obs[transmitter_idx, idx]
     new_data_obs = new_data_obs.flatten()
-    return new_survey_setup, new_survey_data, new_data_obs
+    return new_survey_setup, new_system_spec, new_data_obs
 
 
 def gmt_plate_faces(fpt, forward, problem_setup, model, surface_elevation=400):
