@@ -7,7 +7,8 @@ import operator
 import matplotlib.pyplot as plt
 import pyp223
 import geom_lib
-
+import pickle
+import hashlib
 
 # ------- problem setup
 problem_setup = {
@@ -268,7 +269,7 @@ def plot_survey_map(survey_setup):
             ax.annotate(txt, (survey_setup['tx'][i], survey_setup['ty'][i]))
 
 # ------- wrap plotting functions
-def plot_predicted_data(model, forward, label, ax1=None, ax2=None, **kwargs):
+def plot_transient(model, forward, label, ax1=None, ax2=None, **kwargs):
     vertical_returned = "vertical" in forward.data_returned
     inline_returned = "inline" in forward.data_returned
     if ax1 is None:
@@ -350,8 +351,8 @@ def _plot_data(
     inline_returned,
     ax1,
     ax2,
-    xlabel="mid time of gates",
-    ylabel="(pT/s)",
+    xlabel="Time (s)",
+    ylabel="Response (pT/s)",
     **kwargs,
 ):
     if vertical_returned and inline_returned:
@@ -463,8 +464,8 @@ def plot_field_vertical_vs_tx(
                 False,
                 ax,
                 None,
-                "horizontal distance (m)",
-                "vertical component (fT)",
+                "Horizontal distance (m)",
+                "Vertical component (pT/s)",
                 label=label,
                 **kwargs,
             )
@@ -480,8 +481,8 @@ def plot_field_vertical_vs_tx(
                 False,
                 ax,
                 None,
-                "horizontal distance (m)",
-                "vertical component (fT)",
+                "Horizontal distance (m)",
+                "Vertical component (pT/s)",
                 **kwargs,
             )
 
@@ -504,7 +505,7 @@ def get_subset_of_survey(
                 "Both line_id and fiducial_id are provided. "
                 "Using fiducial_id."
             )
-        transmitter_idx = [
+        fiducial_idx = [
             i
             for i in range(x.size)
             if survey_setup["fiducial_id"][i] in fiducial_id
@@ -512,13 +513,13 @@ def get_subset_of_survey(
     else:
         if line_id is None:
             line_id = list(set(survey_setup["line_id"]))
-        transmitter_idx = [
+        fiducial_idx = [
             i
             for i in range(x.size)
             if survey_setup["line_id"][i] in line_id
         ]
     new_survey_setup = {
-        k: v[transmitter_idx] for k, v in survey_setup.items()
+        k: v[fiducial_idx] for k, v in survey_setup.items()
     }
     if system_spec is None:
         new_system_spec = None
@@ -529,12 +530,12 @@ def get_subset_of_survey(
         new_system_spec["tcls"] = system_spec["tcls"][gate_idx]
     new_data_obs = numpy.zeros(
         (
-            len(transmitter_idx),
+            len(fiducial_idx),
             len(gate_idx),
         )
     )
     for i, idx in enumerate(gate_idx):
-        new_data_obs[:, i] = data_obs[transmitter_idx, idx]
+        new_data_obs[:, i] = data_obs[fiducial_idx, idx]
     new_data_obs = new_data_obs.flatten()
     return new_survey_setup, new_system_spec, new_data_obs
 
@@ -660,26 +661,28 @@ def plot_plate_faces(
     plot_plate_face(
         fpt + ".xz", forward, ax3, True, surface_elevation, **plotting_kwargs
     )
-    ax1.set_xlabel("inline (m)")
-    ax1.set_ylabel("crossline (m)")
-    ax2.set_xlabel("elevation (m)")
-    ax2.set_ylabel("crossline (m)")
-    ax3.set_xlabel("inline (m)")
-    ax3.set_ylabel("elevation (m)")
+    ax1.set_xlabel("Inline (m)")
+    ax1.set_ylabel("Crossline (m)")
+    ax2.set_xlabel("Elevation (m)")
+    ax2.set_ylabel("Crossline (m)")
+    ax3.set_xlabel("Inline (m)")
+    ax3.set_ylabel("Elevation (m)")
 
 
 def plot_plate_faces_single(fpt, option, forward, model, ax, **plotting_kwargs):
     gmt_plate_faces(fpt, forward, forward.problem_setup, model)
     plot_plate_face(fpt + "." + option, forward, ax, "all", **plotting_kwargs)
     if option == "xy":
-        ax.set_xlabel("inline (m)")
-        ax.set_ylabel("crossline (m)")
+        ax.set_xlabel("Inline (m)")
+        ax.set_ylabel("Crossline (m)")
     elif option == "zy":
-        ax.set_xlabel("elevation (m)")
-        ax.set_ylabel("crossline (m)")
+        ax.set_xlabel("Elevation (m)")
+        ax.set_ylabel("Crossline (m)")
+        ax.invert_xaxis()
+
     else:
-        ax.set_xlabel("inline (m)")
-        ax.set_ylabel("elevation (m)")
+        ax.set_xlabel("Inline (m)")
+        ax.set_ylabel("Elevation (m)")
     if "x" in option and forward.n_fiducials > 1:
         tx_min = float("inf")
         tx_max = float("-inf")
@@ -688,3 +691,4 @@ def plot_plate_faces_single(fpt, option, forward, model, ax, **plotting_kwargs):
             tx_min = min(tx_min, tx)
             tx_max = max(tx_max, tx)
         ax.set_xlim(tx_min - 10, tx_max + 10)
+        
