@@ -372,13 +372,14 @@ def _plot_data(
         ax1.set_ylabel(ylabel)
 
 
-def plot_synth_vertical_vs_tx(
+def plot_predicted_profile(
     model,
     forward,
     label,
     gate_idx: list = None,
     line_id: list = None,
     ax=None,
+    cmp='vertical',
     **kwargs,
 ):
     if forward.n_fiducials == 1:
@@ -388,8 +389,10 @@ def plot_synth_vertical_vs_tx(
     x = numpy.array(
         [forward.survey_setup[i]["tx"] for i in range(forward.n_fiducials)]
     )
+    
+    ax.semilogy()
     old_data_returned = forward.data_returned
-    forward.data_returned = ["vertical"]
+    forward.data_returned = [cmp]
     data, data_lengths = forward(model, return_lengths=True)
     idx_to_draw = range(data_lengths[0]) if gate_idx is None else gate_idx
     if line_id is not None:
@@ -434,7 +437,7 @@ def plot_synth_vertical_vs_tx(
     forward.data_returned = old_data_returned
 
 
-def plot_field_vertical_vs_tx(
+def plot_observed_profile(
     survey_setup,
     data_obs,
     label,
