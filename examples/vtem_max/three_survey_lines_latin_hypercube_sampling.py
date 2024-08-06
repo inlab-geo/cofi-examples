@@ -17,7 +17,7 @@
 # to set up the environment. (This [environment.yml](https://github.com/inlab-geo/cofi-examples/blob/main/envs/environment.yml) file
 # specifies a list of packages required to run the notebooks)
 
-# In[1]:
+# In[5]:
 
 
 # -------------------------------------------------------- #
@@ -30,14 +30,14 @@
 # !pip install git+https://github.com/JuergHauser/PyP223.git
 
 
-# In[2]:
+# In[6]:
 
 
 # !git clone https://github.com/inlab-geo/cofi-examples.git
 # %cd cofi-examples/examples/airborne_em
 
 
-# In[3]:
+# In[7]:
 
 
 import numpy
@@ -56,23 +56,23 @@ numpy.random.seed(42)
 
 # # Background
 # 
-# This notebook performes latin hypercube smapling to creeate samples of the objective fucniton for th three survey line example. It is recommended to covnert it into pyhton script using the following command.
+# This notebook performes latin hypercube smapling to creeate samples of the objective function for the three survey line example. It is recommended to covnert it into python script using the following command.
 # 
 # `jupyter nbconvert --to script three_survey_lines_latin_hypercube_sampling.ipynb`
 # 
-# This allows to run the altin hypercube sampling as a script from the comandline to create the samples that form the training and test dataset for the creation of a surrogate model.
+# This allows to run the ltain hypercube sampling as a script from the comandline to create the samples that form the training and test  dataset for the creation of a surrogate model.
 # 
 
-# In[ ]:
+# In[8]:
 
 
-ntrain=2500
-ntest=2500
+ntrain=1000
+ntest=50
 
 
 # ## Problem definition
 
-# In[4]:
+# In[9]:
 
 
 tx_min = 115
@@ -89,7 +89,7 @@ tx = tx.flatten()
 ty = ty.flatten()
 
 
-# In[5]:
+# In[10]:
 
 
 fiducial_id = numpy.arange(len(tx))
@@ -99,7 +99,7 @@ line_id[ty==ty_points[1]] = 1
 line_id[ty==ty_points[2]] = 2
 
 
-# In[6]:
+# In[11]:
 
 
 survey_setup = {
@@ -119,7 +119,7 @@ survey_setup = {
 }
 
 
-# In[7]:
+# In[12]:
 
 
 true_model = {
@@ -138,21 +138,21 @@ true_model = {
 }
 
 
-# In[8]:
+# In[13]:
 
 
 forward = ForwardWrapper(true_model, problem_setup, system_spec, survey_setup,
                          ["pdip","pdzm", "peast", "ptop", "pwdth2"], data_returned=["vertical"])
 
 
-# In[9]:
+# In[14]:
 
 
 # check the order of parameters in a model vector
 forward.params_to_invert
 
 
-# In[10]:
+# In[15]:
 
 
 true_param_value = numpy.array([60,65, 175, 30, 90])
@@ -160,7 +160,7 @@ true_param_value = numpy.array([60,65, 175, 30, 90])
 
 # **Generate synthetic data**
 
-# In[11]:
+# In[16]:
 
 
 data_noise = 0.01
@@ -172,7 +172,7 @@ data_obs = data_pred_true + numpy.random.normal(0, data_noise, data_pred_true.sh
 
 # **Define objective function**
 
-# In[12]:
+# In[17]:
 
 
 def my_objective(model):
@@ -181,14 +181,14 @@ def my_objective(model):
     return residual.T @ residual
 
 
-# In[13]:
+# In[18]:
 
 
 ndim=len(true_param_value)
-xlimits=numpy.array([[10,90],[10,160],[150,190],[25,25],[50,150]])
+xlimits=numpy.array([[10,90],[10,160],[150,190],[25,45],[50,150]])
 
 
-# In[14]:
+# In[19]:
 
 
 sampling = smt.sampling_methods.LHS(xlimits=xlimits,random_state=42)
@@ -198,7 +198,7 @@ xtest=sampling(ntest)
 ytest=[]
 
 
-# In[15]:
+# In[20]:
 
 
 for x in tqdm.tqdm(xtrain):
@@ -207,7 +207,7 @@ for x in tqdm.tqdm(xtest):
     ytest.append(my_objective(x))
 
 
-# In[19]:
+# In[21]:
 
 
 xtrain=numpy.array(xtrain)
@@ -217,10 +217,11 @@ xtest=numpy.array(xtest)
 ytest=numpy.array(ytest)
 
 
-# In[20]:
+# In[22]:
 
 
 with open('three_survey_lines_lhs.npy', 'wb') as f:
+    numpy.save(f,ndim)
     numpy.save(f,xtrain)
     numpy.save(f,ytrain)
     numpy.save(f,xtest)
@@ -233,11 +234,17 @@ with open('three_survey_lines_lhs.npy', 'wb') as f:
 # <!-- Feel free to add more modules in the watermark_list below, if more packages are used -->
 # <!-- Otherwise please leave the below code cell unchanged -->
 
-# In[18]:
+# In[24]:
 
 
-watermark_list = ["cofi", "numpy", "scipy", "matplotlib"]
+watermark_list = ["cofi", "numpy", "scipy", "matplotlib","smt"]
 for pkg in watermark_list:
     pkg_var = __import__(pkg)
     print(pkg, getattr(pkg_var, "__version__"))
+
+
+# In[ ]:
+
+
+
 
