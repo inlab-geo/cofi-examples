@@ -185,7 +185,7 @@ def my_objective(model):
 
 
 ndim=len(true_param_value)
-xlimits=numpy.array([[10,90],[10,160],[150,190],[25,45],[50,150]])
+xlimits=numpy.array([[10,80],[30,150],[150,190],[25,45],[60,120]])
 
 
 # In[19]:
@@ -222,6 +222,7 @@ ytest=numpy.array(ytest)
 
 with open('three_survey_lines_lhs.npy', 'wb') as f:
     numpy.save(f,ndim)
+    numpy.save(f,xlimits)
     numpy.save(f,xtrain)
     numpy.save(f,ytrain)
     numpy.save(f,xtest)
