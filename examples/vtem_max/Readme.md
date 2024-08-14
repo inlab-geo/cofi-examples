@@ -7,7 +7,6 @@ halfspace of a layered earth,
 
 - Background
 	- [Thin plate inversion](./thin_plate_inversion.ipynb)
-
 - Synthetic examples
     - Inverting a single survey line
         - [Inline and vertical component](./single_survey_line.ipynb).
