@@ -2,7 +2,7 @@
 
 This is a series  of notebooks that illustrate how CoFI can be employed to 
 invert VTEM max data for a thin plate layered earth hybrid model, that is a model 
-where an electrical conductive traget is approximated by a thin plate in the 
+where an electrically conductive traget is approximated by a thin plate in the 
 halfspace of a layered earth,
 
 - Background
