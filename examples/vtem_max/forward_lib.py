@@ -560,7 +560,8 @@ def plot_plate_face(
         ax.axhline(surface_elevation, color="black", linestyle="--")
     elif "zy" in full_fpth:
         ax.axvline(surface_elevation, color="black", linestyle="--")
-        ax.invert_xaxis()
+        if not (ax.xaxis_inverted()):
+	        ax.invert_xaxis()
     if cleanup == True:
         os.remove(full_fpth)
     elif cleanup == "all":
