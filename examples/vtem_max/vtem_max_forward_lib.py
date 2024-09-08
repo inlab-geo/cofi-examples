@@ -7,7 +7,7 @@ import operator
 import matplotlib.pyplot as plt
 
 import pyp223
-import geom_lib
+import vtem_max_geom_lib
 import pickle
 import hashlib
 
@@ -472,7 +472,7 @@ def gmt_plate_faces(fpt, forward, problem_setup, model, surface_elevation=400):
     model = forward.model_dict(model)
 
     for i in range(problem_setup["nplt"]):
-        f[:, :, :] = geom_lib.get_plate_faces_from_orientation(
+        f[:, :, :] = vtem_max_geom_lib.get_plate_faces_from_orientation(
             model["peast"][i],
             model["pnorth"][i],
             surface_elevation - model["ptop"][i],
