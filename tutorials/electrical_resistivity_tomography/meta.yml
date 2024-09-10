@@ -1,0 +1,13 @@
+title: PyGIMLi ERT
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical and electromagnetic methods in geophysics -> Electrical -> Electrical resistivity tomography
+description: Using the ERT solver provided by PyGIMLi, we use different CoFI solvers to solve the corresponding inverse problem
+method:
+  electrical_resistivity_tomography.ipynb: 
+    - CoFI -> Parameter Estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
+    - CoFI -> Parameter Estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> LBFGS
+    

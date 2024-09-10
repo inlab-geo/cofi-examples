@@ -1,0 +1,8 @@
+title: FMM Tomography
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Travel times -> Non-linear tomography
+description: Seismic wave tomography via fast marching method
+method:
+  fmm_tomography.ipynb:
+    - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG

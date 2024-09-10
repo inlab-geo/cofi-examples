@@ -1,0 +1,8 @@
+title: Surface wave dispersion 
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Joint inversion -> Surface wave dispersion and receiver function
+description: We utlise CoFI to run optimsiation, fixed-dimensional sampling and trans-dimensional sampling on a surface wave dispersion curve inversion problem
+method:
+  1D_rayleigh_wave_phase_velocity_inversion:
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler
