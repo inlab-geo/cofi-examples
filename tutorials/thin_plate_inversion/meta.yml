@@ -2,10 +2,10 @@ title: VTEM max Thin plate inversion
 application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical and electromagnetic methods in geophysics -> Electromagnetic -> Thin plate approximation
 description: Using the forward solver provided by P223 and CoFI to invert for a thin plate target
 method:
-  thin_pate_inversion.ipynb: 
+  thin_plate_inversion.ipynb: 
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> bayesbay -> VanillaSampler
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
     - CoFI -> Ensemble methods -> Direct search  -> Monte Carlo -> Neighpy
-    
+  
