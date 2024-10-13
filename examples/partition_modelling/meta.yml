@@ -1,0 +1,6 @@
+title: Analysis of Eustatic Sea-level heights using partition modelling
+application domain: CoFI Examples -> EARTH SCIENCES-> Geophysics ->  Geodynamics -> Eustatic Sealevel changes
+description: Fitting a partition model to Eustatic Sea-level heights using trans-D Bayesian partition modelling
+method:
+  Partition_modelling_sealevel_bayesbay.ipynb: 
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler
