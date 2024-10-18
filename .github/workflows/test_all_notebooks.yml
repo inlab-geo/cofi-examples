@@ -27,7 +27,7 @@ jobs:
 
       - name: Set up Python env
         run: |
-          python -m pip install matplotlib
+          python -m pip install matplotlib papermill
 
       - name: Install CoFI
         run: |
