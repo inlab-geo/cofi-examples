@@ -35,7 +35,7 @@ jobs:
 
       - name: Run script
         run: |
-          python tools/run_notebooks/run_notebooks.py
+          python tools/run_notebooks/run_notebooks.py all
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
