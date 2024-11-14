@@ -20,4 +20,4 @@ dependencies:
     - ipywidgets>=7.7.0
     - tqdm>=4.0
     - seislib>=0.6.7
-    - git+https://github.com/inlab-geo/pysurf96.git
+    - git+https://github.com/inlab-geo/pysurf96.git@ctypes
