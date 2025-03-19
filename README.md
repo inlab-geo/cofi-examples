@@ -19,6 +19,7 @@ This repository contains examples for running inversion algorithms using CoFI wi
 
 An interactive web-based explorer is available that allows the user to find examples and tutorials of interest, organized either from an application domain perspective, or a inference methods perspective. go to [https://inlab.au/inlab-explorer/]
 
+Alternatively you can just explore the examples or the tutorials directories in this repository.
 
 ## Run the examples
 
