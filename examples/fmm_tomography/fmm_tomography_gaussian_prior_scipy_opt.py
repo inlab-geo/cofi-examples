@@ -11,7 +11,9 @@ import numpy as np
 from cofi import BaseProblem, InversionOptions, Inversion
 from cofi.utils import GaussianPrior
 from espresso import FmmTomography
+import pyfm2d as wt # import fmm package 
 
+usepyfm2d = True # switch to use either fmm from pyfm2d (True) package or geo-espresso (False)
 
 # get espresso problem FmmTomography information
 fmm = FmmTomography()
@@ -38,21 +40,43 @@ np.fill_diagonal(Cdi, 1 / sigma**2)
 
 # define chi square function
 def chi_square(model_slowness, esp_fmm, Cd_inv):
-    pred = esp_fmm.forward(model_slowness)
+    if(usepyfm2d):
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent) # track wavefronts
+        pred = result.ttimes   
+    else:
+        pred = esp_fmm.forward(model_slowness)
     residual = esp_fmm.data - pred
     model_diff = model_slowness - ref_start_slowness
     return residual.T @ Cd_inv @ residual + gaussian_prior(model_slowness)
 
 
 def gradient(model_slowness, esp_fmm, Cd_inv):
-    pred, jac = esp_fmm.forward(model_slowness, return_jacobian=True)
+    if(usepyfm2d):
+        options = wt.WaveTrackerOptions(
+                    paths=True,
+                    frechet=True,
+                    )
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
+        pred = result.ttimes
+        jac = result.frechet.toarray()
+    else:
+        pred, jac = esp_fmm.forward(model_slowness, return_jacobian=True)
+        
     residual = esp_fmm.data - pred
     model_diff = model_slowness - ref_start_slowness
     return -jac.T @ Cd_inv @ residual + gaussian_prior.gradient(model_slowness)
 
 
 def hessian(model_slowness, esp_fmm, Cd_inv):
-    A = esp_fmm.jacobian(model_slowness)
+    if(usepyfm2d):
+        options = wt.WaveTrackerOptions(
+                    paths=True,
+                    frechet=True,
+                    )
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options)
+        A = result.frechet.toarray()
+    else:
+        A = esp_fmm.jacobian(model_slowness)     
     return A.T @ Cd_inv @ A + gaussian_prior.hessian(model_slowness)
 
 

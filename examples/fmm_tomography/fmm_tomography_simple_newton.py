@@ -9,7 +9,9 @@ Last updated July 2022
 from cofi import BaseProblem, InversionOptions, Inversion
 from cofi.utils import QuadraticReg
 from espresso import FmmTomography
+import pyfm2d as wt # import fmm package 
 
+usepyfm2d = True # switch to use either fmm from pyfm2d (True) package or geo-espresso (False)
 
 # get espresso problem FmmTomography information
 fmm = FmmTomography()
@@ -47,7 +49,11 @@ sigma = 0.00001  # Noise is 1.0E-4 is ~5% of standard deviation of initial trave
 
 
 def objective_func(slowness):
-    ttimes = fmm.forward(slowness)
+    if(usepyfm2d):
+        result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent) # track wavefronts
+        ttimes = result.ttimes
+    else:
+        ttimes = fmm.forward(slowness)
     residual = fmm.data - ttimes
     data_misfit = residual.T @ residual / sigma**2
     model_reg = reg(slowness)
@@ -55,17 +61,35 @@ def objective_func(slowness):
 
 
 def gradient(slowness):
-    ttimes, A = fmm.forward(slowness, return_jacobian=True)
+    if(usepyfm2d):
+        options = wt.WaveTrackerOptions(
+                    paths=True,
+                    frechet=True,
+                    )
+        result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
+        ttimes = result.ttimes
+        A = result.frechet.toarray()
+    else:
+        ttimes, A = fmm.forward(slowness, with_jacobian=True)
     data_misfit_grad = -2 * A.T @ (fmm.data - ttimes) / sigma**2
     model_reg_grad = reg.gradient(slowness)
     return data_misfit_grad + model_reg_grad
 
 
 def hessian(slowness):
-    A = fmm.jacobian(slowness)
+    if(usepyfm2d):
+        options = wt.WaveTrackerOptions(
+                    paths=True,
+                    frechet=True,
+                    )
+        result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options)
+        A = result.frechet.toarray()
+    else:
+        A = fmm.jacobian(slowness)
     data_misfit_hess = 2 * A.T @ A / sigma**2
     model_reg_hess = reg.hessian(slowness)
     return data_misfit_hess + model_reg_hess
+
 
 
 fmm_problem.set_objective(objective_func)
