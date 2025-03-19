@@ -15,6 +15,12 @@ Read [CoFI's documentation](https://cofi.readthedocs.io/en/latest/) for more det
 
 This repository contains examples for running inversion algorithms using CoFI with increasing complexity in problems.
 
+## Explore the examples and tutorials
+
+An interactive web-based explorer is available that allows the user to find examples and tutorials of interest, organized either from an application domain perspective, or a inference methods perspective. Go to [https://inlab.au/inlab-explorer/]
+
+Alternatively you can just explore the examples or the tutorials directories in this repository.
+
 ## Run the examples
 
 - To run the examples interactively without any local setup, click on the "Colab" 
