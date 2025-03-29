@@ -3,11 +3,13 @@ application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical 
 description: Using the ERT solver provided by PyGIMLi, we use different CoFI solvers to solve the corresponding inverse problem
 method:
   pygimli_ert.ipynb: 
-    - CoFI -> Parameter Estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    description: Using the ERT solver provided by PyGIMLi, we use a trust-exact method to solve the corresponding inverse problem
+    methods: 
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
   pygimli_ert_rect_gauss_newton.py:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
   pygimli_ert_rect_scipy_min.py:
-    - CoFI -> Parameter Estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
   pygimli_ert_toy_emcee_parallel.py:
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   pygimli_ert_toy_emcee.py:
@@ -15,6 +17,6 @@ method:
   pygimli_ert_tri_gauss_newton.py:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
   pygimli_ert_tri_scipy_min.py:
-    - CoFI -> Parameter Estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
+    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
   pygimli_ert_tri_torch_optim.py:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> LBFGS
