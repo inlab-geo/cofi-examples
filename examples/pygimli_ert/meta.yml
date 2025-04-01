@@ -9,7 +9,7 @@ method:
   pygimli_ert_rect_gauss_newton.py:
     description: Using the ERT solver provided by PyGIMLi, we use a Gauss Newton method to solve the inverse problem
     methods: 
-    - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
   pygimli_ert_rect_scipy_min.py:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-exact
   pygimli_ert_toy_emcee_parallel.py:
