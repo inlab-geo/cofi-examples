@@ -1,6 +1,6 @@
 title: Receiver Function Inversion
 application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Receiver function -> Receiver function inversion
-description: We run inversion on a toy receiver function model with optimization and sampling in this example
+description: We invert a receiver function using both optimization and sampling
 method:
   receiver_function_inversion.ipynb:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Nelder-Mead
