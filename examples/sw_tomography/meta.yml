@@ -1,6 +1,6 @@
 title: Surface Wave Tomography via Seislib
 application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Surface wave / ambient noise -> Surface Wave Tomography
-description: We map surface-wave velocity across the continental USA by solving a 2-D tomography problem using two approaches regularised least-squares and trans-dimensional sampling
+description: We map surface-wave velocity across the continental USA by solving a 2-D tomography problem using different approaches (regularised least-squares and trans-dimensional sampling)
 method:
   sw_tomography.ipynb:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
