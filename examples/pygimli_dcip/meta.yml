@@ -3,7 +3,11 @@ application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical 
 description: Using the DCIP solver provided by PyGIMLi, we use different CoFI solvers to solve the corresponding inverse problem
 method:
   pygimli_dcip.ipynb: 
+    description: DCIP inversion for a synthetic test problem
+    methods:   
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> RAdam
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-ncg
   pygimli_dcip_century_tri_mesh.ipynb: 
+    description: DCIP inversion for the Century Deposit
+    methods:   
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> trust-ncg
