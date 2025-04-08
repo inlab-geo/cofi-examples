@@ -2,6 +2,8 @@ title: Non-linear Curve Fitting
 application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Statistics -> Applied statistics -> Curve fitting -> Non linear regression
 description: Non-linear curve fitting
 method:
-  nonlinear_curve_fitting.ipynb: 
-    - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> lm
-    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+  nonlinear_curve_fitting.ipynb:
+    description: We solve a synthetic non-linear curve fitting problem in a deterministic setting (using Levenberg-Marquardt) and a probabilistic setting (using the stretch move in an affine-invariant sampler)
+    methods:
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> lm
+      - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
