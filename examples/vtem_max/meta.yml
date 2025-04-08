@@ -3,18 +3,32 @@ application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Electrical 
 description: Using the forward solver provided by P223 and CoFI to invert for a thin plate target
 method:
   thin_plate_inversion.ipynb: 
+    description: Introduction of the thin plate inverse problem for airborne electromagetic data
+    methods: 
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   single_survey_line.ipynb:
+    description: Inverting the inline and vertical conmponent of a single survey line for a thin plate target 
+    methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
   single_survey_line_vertical_only.ipynb:
+    description: Inverting the vertical conmponent of a single survey line for a thin plate target 
+    methods:
       - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
   three_survey_lines_parameter_estimation.ipynb:
+    description: Inverting for a thin plate target using a newton conjugate gradient method
+    methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Newton-CG
   three_survey_lines_smt_baysbay.ipynb:
+    description:  Inverting for a thin plate target using bayesbay
+    methods:
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> bayesbay -> VanillaSampler
   three_survey_lines_smt_emcee.ipynb:
+    description: Inverting for a thin plate target using emcee
+    methods:
    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   three_survey_lines_smt_neighpy.ipynb:
+    description: Inverting for a thin plate target using neighpy
+    methods:
     - CoFI -> Ensemble methods -> Direct search  -> Monte Carlo -> Neighpy
 
