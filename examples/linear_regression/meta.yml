@@ -3,6 +3,8 @@ application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Statistics -> Appl
 description: Linear regression problem solved by linear solver, optimizer and sampler
 method:
   linear_regression.ipynb:
+    description: Demonstrates polynomial curve fitting with matrix based linear solver, scipy optimisation of a misfit, and Bayesian sampling of a posterior PDF.
+    methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
