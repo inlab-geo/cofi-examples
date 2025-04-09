@@ -41,3 +41,7 @@ method:
     description: Script demonstrating Neighbourhood Algorithm for direct search applied to a simple polynomial regression problem.
     methods:
     - CoFI -> Ensemble methods -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm
+  linear_regression_bayesbay.py:
+    description: Script demonstrating BayesBay for Trans_D Bayesian sampling of curve misfit for a simple polynomial regression problem.
+    methods:
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> BayesBay
