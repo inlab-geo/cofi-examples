@@ -44,4 +44,4 @@ method:
   linear_regression_bayesbay.py:
     description: Script demonstrating BayesBay for Trans_D Bayesian sampling of curve misfit for a simple polynomial regression problem.
     methods:
-    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> BayesBay
+    - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler
