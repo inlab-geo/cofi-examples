@@ -18,6 +18,8 @@ method:
     methods:
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   linear_regression_linear_system_solver.py:
+    description: Script demonstrating (local) matrix based solver for a simple polynomial regression problem.
+    methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
   linear_regression_linear_system_general.py:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
