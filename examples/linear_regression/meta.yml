@@ -22,6 +22,8 @@ method:
     methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
   linear_regression_linear_system_general.py:
+    description: Script demonstrating scipy Least Squares matrix based solver for a simple polynomial regression problem.
+    methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
   linear_regression_optimizer_lstsq.py:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> trf
