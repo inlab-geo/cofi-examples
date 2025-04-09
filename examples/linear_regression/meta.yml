@@ -14,6 +14,8 @@ method:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   linear_regression_emcee_sampler.py:
+    description: Script demonstrating Bayesian sampling with emcee in a simple polynomial regression problem.
+    methods:
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   linear_regression_linear_system_solver.py:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
