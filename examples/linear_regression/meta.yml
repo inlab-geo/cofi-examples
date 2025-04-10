@@ -34,6 +34,4 @@ method:
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
   linear_regression_pytorch_optim.py:
-    description: Script demonstrating PyTorch minimisation of curve misfit for a simple polynomial regression problem.
-    methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> Adam
