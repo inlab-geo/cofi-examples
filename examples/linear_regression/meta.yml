@@ -30,7 +30,7 @@ method:
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> trf
   linear_regression_optimizer_minimize.py:
-    description: Script demonstrating scipy misfit optimisation based solver for a simple polynomial regression problem.
+    description: Script demonstrating scipy least squares based solver for a simple polynomial regression problem.
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
   linear_regression_pytorch_optim.py:
