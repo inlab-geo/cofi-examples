@@ -37,3 +37,8 @@ method:
     description: Script demonstrating pytorch misfit minimisation of a curve for a simple polynomial regression problem.
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> torch.optim -> Adam
+  linear_regression_neighpy.py:
+    description: Script demonstrating Neighbourhood Algorithm for direct search applied to a simple polynomial regression problem.
+    methods:
+    - CoFI -> Ensemble methods -> Direct search  -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm
+
