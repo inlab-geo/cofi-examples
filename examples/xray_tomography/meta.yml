@@ -3,6 +3,10 @@ application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology 
 description: We look at a linear inverse problem based on Xray Tomography
 method:
   xray_tomography.ipynb:
+    description: Solves overdetermined linear system with Least Squares using scipy for 2D Xray tomography problem in Cartesian co-ordinates.
+    methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
   xray_tomography_linear_solver.py:
+    description: Script for solving overdetermined linear system for 2D Xray tomography problem in Cartesian co-ordinates.
+    methods:
     - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
