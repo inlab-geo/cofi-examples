@@ -1,10 +1,11 @@
 """Seismic waveform inference with Fast Marching and CoFI
 
 Based on original scripts by Andrew Valentine & Malcolm Sambridge -
-Research Schoole of Earth Sciences, The Australian National University
+Research School of Earth Sciences, The Australian National University
 Last updated July 2022
 
 """
+import numpy as np
 
 from cofi import BaseProblem, InversionOptions, Inversion
 from cofi.utils import QuadraticReg
@@ -19,6 +20,14 @@ model_size = fmm.model_size  # number of model parameters
 model_shape = fmm.model_shape  # 2D spatial grids
 data_size = fmm.data_size  # number of data points
 ref_start_slowness = fmm.starting_model
+
+# temporarily overwrite espresso data
+read = True
+if(read):
+    ttdat = np.loadtxt('datasets/ttimes_crossb_nwt_s10_r10.dat')
+    obstimes = ttdat[:,2]
+else:
+    obstimes = fmm.data
 
 # define CoFI BaseProblem
 fmm_problem = BaseProblem()
@@ -45,16 +54,19 @@ reg_smoothing = smoothing_factor * QuadraticReg(
 reg = reg_damping + reg_flattening + reg_smoothing
 fmm_problem.set_regularization(reg)
 
-sigma = 0.00001  # Noise is 1.0E-4 is ~5% of standard deviation of initial travel time residuals
+sigma = 0.000008          # data standard deviation of noise
 
 
 def objective_func(slowness):
     if(usepyfm2d):
-        result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent) # track wavefronts
+        options = wt.WaveTrackerOptions(
+                  cartesian=True,
+                  )
+        result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
         ttimes = result.ttimes
     else:
         ttimes = fmm.forward(slowness)
-    residual = fmm.data - ttimes
+    residual = obstimes - ttimes
     data_misfit = residual.T @ residual / sigma**2
     model_reg = reg(slowness)
     return data_misfit + model_reg
@@ -65,13 +77,14 @@ def gradient(slowness):
         options = wt.WaveTrackerOptions(
                     paths=True,
                     frechet=True,
+                    cartesian=True,
                     )
         result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
         ttimes = result.ttimes
         A = result.frechet.toarray()
     else:
         ttimes, A = fmm.forward(slowness, with_jacobian=True)
-    data_misfit_grad = -2 * A.T @ (fmm.data - ttimes) / sigma**2
+    data_misfit_grad = -2 * A.T @ (obstimes - ttimes) / sigma**2
     model_reg_grad = reg.gradient(slowness)
     return data_misfit_grad + model_reg_grad
 
@@ -81,6 +94,7 @@ def hessian(slowness):
         options = wt.WaveTrackerOptions(
                     paths=True,
                     frechet=True,
+                    cartesian=True,
                     )
         result = wt.calc_wavefronts(1./slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options)
         A = result.frechet.toarray()

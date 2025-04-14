@@ -1,7 +1,7 @@
 """Seismic waveform inference with Fast Marching and CoFI
 
 Based on original scripts by Andrew Valentine & Malcolm Sambridge -
-Research Schoole of Earth Sciences, The Australian National University
+Research School of Earth Sciences, The Australian National University
 Last updated July 2022
 
 """
@@ -22,39 +22,53 @@ model_shape = fmm.model_shape
 data_size = fmm.data_size
 ref_start_slowness = fmm.starting_model
 
+# temporarily overwrite espresso data
+read = True
+if(read):
+    ttdat = np.loadtxt('datasets/ttimes_crossb_nwt_s10_r10.dat')
+    obstimes = ttdat[:,2]
+else:
+    obstimes = fmm.data
+
 # define regularization (Gaussian Prior)
 corrx = 3.0
 corry = 3.0
-sigma_slowness = 0.002**2
-gaussian_prior = GaussianPrior(
+#sigma_slowness = 0.002**2
+sigma_slowness = 2.5E-6
+gauss_weight = 0.01
+gaussian_prior = gauss_weight * GaussianPrior(
     model_covariance_inv=((corrx, corry), sigma_slowness),
     mean_model=ref_start_slowness.reshape(model_shape)
 )
 
 # define data covariance matrix
-sigma = 0.00001
+sigma = 0.000008          # data standard deviation of noise
 Cd = np.zeros([data_size, data_size])
 np.fill_diagonal(Cd, sigma**2)
 Cdi = np.zeros([data_size, data_size])
 np.fill_diagonal(Cdi, 1 / sigma**2)
 
 # define chi square function
-def chi_square(model_slowness, esp_fmm, Cd_inv):
+def chi_square(model_slowness, obstimes, esp_fmm, Cd_inv):
     if(usepyfm2d):
-        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent) # track wavefronts
+        options = wt.WaveTrackerOptions(
+                  cartesian=True,
+                  )
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
         pred = result.ttimes   
     else:
         pred = esp_fmm.forward(model_slowness)
-    residual = esp_fmm.data - pred
+    residual = obstimes - pred
     model_diff = model_slowness - ref_start_slowness
     return residual.T @ Cd_inv @ residual + gaussian_prior(model_slowness)
 
 
-def gradient(model_slowness, esp_fmm, Cd_inv):
+def gradient(model_slowness, obstimes, esp_fmm, Cd_inv):
     if(usepyfm2d):
         options = wt.WaveTrackerOptions(
                     paths=True,
                     frechet=True,
+                    cartesian=True,
                     )
         result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
         pred = result.ttimes
@@ -62,7 +76,7 @@ def gradient(model_slowness, esp_fmm, Cd_inv):
     else:
         pred, jac = esp_fmm.forward(model_slowness, return_jacobian=True)
         
-    residual = esp_fmm.data - pred
+    residual = obstimes - pred
     model_diff = model_slowness - ref_start_slowness
     return -jac.T @ Cd_inv @ residual + gaussian_prior.gradient(model_slowness)
 
@@ -72,6 +86,7 @@ def hessian(model_slowness, esp_fmm, Cd_inv):
         options = wt.WaveTrackerOptions(
                     paths=True,
                     frechet=True,
+                    cartesian=True,
                     )
         result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options)
         A = result.frechet.toarray()
@@ -83,8 +98,8 @@ def hessian(model_slowness, esp_fmm, Cd_inv):
 # define CoFI BaseProblem
 fmm_problem = BaseProblem()
 fmm_problem.set_initial_model(ref_start_slowness)
-fmm_problem.set_objective(chi_square, args=[fmm, Cdi])
-fmm_problem.set_gradient(gradient, args=[fmm, Cdi])
+fmm_problem.set_objective(chi_square, args=[obstimes,fmm, Cdi])
+fmm_problem.set_gradient(gradient, args=[obstimes,fmm, Cdi])
 fmm_problem.set_hessian(hessian, args=[fmm, Cdi])
 
 # define CoFI InversionOptions
