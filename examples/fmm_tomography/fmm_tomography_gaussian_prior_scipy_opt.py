@@ -17,18 +17,24 @@ usepyfm2d = True # switch to use either fmm from pyfm2d (True) package or geo-es
 
 # get espresso problem FmmTomography information
 fmm = FmmTomography()
-model_size = fmm.model_size
-model_shape = fmm.model_shape
-data_size = fmm.data_size
-ref_start_slowness = fmm.starting_model
 
 # temporarily overwrite espresso data
 read = True
 if(read):
-    ttdat = np.loadtxt('datasets/ttimes_crossb_nwt_s10_r10.dat')
+    data_base_path = "../../data/fmm_tomography"
+    ttdat = np.loadtxt(f"{data_base_path}/ttimes_crossb_nwt_s10_r10.dat")
+    sources = np.loadtxt(f"{data_base_path}/sources_crossb_nwt_s10.dat")[:,1:]
+    receivers = np.loadtxt(f"{data_base_path}/receivers_crossb_nwt_r10.dat")[:,1:]
     obstimes = ttdat[:,2]
 else:
     obstimes = fmm.data
+    sources = fmm.sources
+    receivers = fmm.receivers
+    
+model_size = fmm.model_size
+model_shape = fmm.model_shape
+data_size = fmm.data_size
+ref_start_slowness = fmm.starting_model
 
 # define regularization (Gaussian Prior)
 corrx = 3.0
@@ -54,7 +60,7 @@ def chi_square(model_slowness, obstimes, esp_fmm, Cd_inv):
         options = wt.WaveTrackerOptions(
                   cartesian=True,
                   )
-        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),receivers,sources,extent=fmm.extent,options=options) # track wavefronts
         pred = result.ttimes   
     else:
         pred = esp_fmm.forward(model_slowness)
@@ -70,7 +76,7 @@ def gradient(model_slowness, obstimes, esp_fmm, Cd_inv):
                     frechet=True,
                     cartesian=True,
                     )
-        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options) # track wavefronts
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),receivers,sources,extent=fmm.extent,options=options) # track wavefronts
         pred = result.ttimes
         jac = result.frechet.toarray()
     else:
@@ -88,7 +94,7 @@ def hessian(model_slowness, esp_fmm, Cd_inv):
                     frechet=True,
                     cartesian=True,
                     )
-        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),fmm.receivers,fmm.sources,extent=fmm.extent,options=options)
+        result = wt.calc_wavefronts(1./model_slowness.reshape(fmm.model_shape),receivers,sources,extent=fmm.extent,options=options)
         A = result.frechet.toarray()
     else:
         A = esp_fmm.jacobian(model_slowness)     
