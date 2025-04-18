@@ -19,7 +19,7 @@ usepyfm2d = True # switch to use either fmm from pyfm2d (True) package or geo-es
 fmm = FmmTomography()
 
 # temporarily overwrite espresso data
-read = True
+read = False
 if(read):
     data_base_path = "../../data/fmm_tomography"
     ttdat = np.loadtxt(f"{data_base_path}/ttimes_crossb_nwt_s10_r10.dat")
