@@ -15,28 +15,6 @@ TUTORIALS = "tutorials"
 TUTORIALS_DIR = str(root_dir / TUTORIALS)
 
 
-def extract_warnings_from_notebook(nb_path):
-    warnings_found = set()
-    try:
-        nb = nbformat.read(nb_path, as_version=4)
-        for cell in nb.cells:
-            if cell.cell_type == "code" and "outputs" in cell:
-                for output in cell.outputs:
-                    # Look for text in standard output
-                    if output.output_type == "stream" and "Warning" in output.text:
-                        for line in output.text.splitlines():
-                            if "Warning" in line:
-                                warnings_found.add(line.strip())
-                    # Look for errors (tracebacks)
-                    if output.output_type == "error":
-                        for line in output.get("traceback", []):
-                            if "Warning" in line:
-                                warnings_found.add(line.strip())
-    except Exception:
-        pass
-    return sorted(warnings_found)
-
-
 def execute_notebook(input_path, output_path, cwd=None, params=None):
     """
     Executes a notebook and returns (status, message):
@@ -47,35 +25,78 @@ def execute_notebook(input_path, output_path, cwd=None, params=None):
         pm.execute_notebook(input_path, output_path, cwd=cwd, parameters=params)
         warnings_in_nb = extract_warnings_from_notebook(output_path)
         if warnings_in_nb:
-            msg = "; ".join(warnings_in_nb)
-            if len(msg) > 80:
-                msg = msg[:77] + "..."
+            msg = summarise_warnings(warnings_in_nb)
             return "WARNING", msg
         return "PASSED", ""
-
     except Exception as e:
-        # Get exception class
-        ex_class = e.__class__.__name__
-        # Split lines and clean up
-        lines = [line.strip() for line in str(e).splitlines() if line.strip()]
-        # Skip separator lines
-        meaningful = [l for l in lines if l and not all(c == "-" for c in l)]
-        # Find the first message line *after* any "Exception encountered at" header
-        msg = ""
-        for i, l in enumerate(meaningful):
-            if "Exception encountered at" in l and i + 1 < len(meaningful):
-                msg = meaningful[
-                    i + 1
-                ]  # The next line should be the actual error message
+        msg = summarise_exception_message(e)
+        return "FAILED", msg
+
+
+def extract_warnings_from_notebook(nb_path):
+    """Extract warning-like messages from executed notebook outputs."""
+    warnings_found = set()
+    try:
+        nb = nbformat.read(nb_path, as_version=4)
+        for cell in nb.cells:
+            if cell.cell_type == "code" and "outputs" in cell:
+                for output in cell.outputs:
+                    # Check output stream for 'Warning'
+                    if output.output_type == "stream" and "Warning" in output.text:
+                        for line in output.text.splitlines():
+                            if "Warning" in line:
+                                warnings_found.add(line.strip())
+                    # Check error outputs
+                    if output.output_type == "error":
+                        for line in output.get("traceback", []):
+                            if "Warning" in line:
+                                warnings_found.add(line.strip())
+    except Exception:
+        pass
+    return sorted(warnings_found)
+
+
+def summarise_warnings(warnings_in_nb, maxlen=80):
+    """Return a compact string of unique warning messages."""
+    msg = "; ".join(warnings_in_nb)
+    if len(msg) > maxlen:
+        msg = msg[: maxlen - 3] + "..."
+    return msg
+
+
+def summarise_exception_message(e, maxlen=90):
+    """Extract and format the most relevant exception info for reporting."""
+    ex_class = e.__class__.__name__
+    lines = [
+        line.strip()
+        for line in str(e).splitlines()
+        if line.strip() and not line.strip().startswith("Traceback")
+    ]
+    # Prefer an underlying Python error (e.g., ModuleNotFoundError: ...)
+    py_err_line = None
+    for l in lines:
+        if ":" in l and not l.startswith("Exception encountered"):
+            py_err_line = l
+            break
+    if py_err_line:
+        msg = py_err_line
+    elif lines:
+        msg = lines[0]
+        if len(lines) > 1 and (msg.endswith("Error") or msg.endswith("Exception")):
+            msg += f": {lines[1]}"
+    else:
+        msg = repr(e)
+    # For PapermillExecutionError, prefer the most informative line at the end
+    if "PapermillExecutionError" in ex_class and "Traceback" in str(e):
+        for l in reversed(lines):
+            if ":" in l and not l.startswith("Traceback"):
+                msg = l
                 break
-        if not msg:
-            # Fallback: take the first non-separator line
-            msg = meaningful[0] if meaningful else repr(e)
-        # Combine class and message
-        full_msg = f"{ex_class}: {msg}"
-        if len(full_msg) > 80:
-            full_msg = full_msg[:77] + "..."
-        return "FAILED", full_msg
+    msg = f"{ex_class}: {msg}"
+    msg = " ".join(msg.split())  # Collapse internal whitespace
+    if len(msg) > maxlen:
+        msg = msg[: maxlen - 3] + "..."
+    return msg
 
 
 def get_ordered_ipynbs_in_dir(dirpath):
