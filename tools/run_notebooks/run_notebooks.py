@@ -1,9 +1,11 @@
 from collections import defaultdict
+import nbformat
 import os
 from pathlib import Path
 import papermill as pm
 import sys
 import warnings
+
 
 current_dir = Path(__file__).resolve().parent
 root_dir = current_dir.parent.parent
@@ -13,6 +15,28 @@ TUTORIALS = "tutorials"
 TUTORIALS_DIR = str(root_dir / TUTORIALS)
 
 
+def extract_warnings_from_notebook(nb_path):
+    warnings_found = set()
+    try:
+        nb = nbformat.read(nb_path, as_version=4)
+        for cell in nb.cells:
+            if cell.cell_type == "code" and "outputs" in cell:
+                for output in cell.outputs:
+                    # Look for text in standard output
+                    if output.output_type == "stream" and "Warning" in output.text:
+                        for line in output.text.splitlines():
+                            if "Warning" in line:
+                                warnings_found.add(line.strip())
+                    # Look for errors (tracebacks)
+                    if output.output_type == "error":
+                        for line in output.get("traceback", []):
+                            if "Warning" in line:
+                                warnings_found.add(line.strip())
+    except Exception:
+        pass
+    return sorted(warnings_found)
+
+
 def execute_notebook(input_path, output_path, cwd=None, params=None):
     """
     Executes a notebook and returns (status, message):
@@ -20,22 +44,25 @@ def execute_notebook(input_path, output_path, cwd=None, params=None):
       - message: warnings (if any), else concise error, else empty string
     """
     try:
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            pm.execute_notebook(input_path, output_path, cwd=cwd, parameters=params)
-            if w:
-                warning_msgs = set(str(warn.message) for warn in w)
-                sorted_msgs = sorted(warning_msgs)
-                msg = "; ".join(sorted_msgs)
-                # Truncate if overly long
-                # if len(msg) > 50:
-                #     msg = msg[:47] + "..."
-                return "WARNING", msg
+        pm.execute_notebook(input_path, output_path, cwd=cwd, parameters=params)
+        warnings_in_nb = extract_warnings_from_notebook(output_path)
+        if warnings_in_nb:
+            msg = "; ".join(warnings_in_nb)
+            if len(msg) > 80:
+                msg = msg[:77] + "..."
+            return "WARNING", msg
         return "PASSED", ""
+
     except Exception as e:
-        msg = str(e).splitlines()[0]
-        if len(msg) > 50:
-            msg = msg[:47] + "..."
+        lines = [line for line in str(e).splitlines() if line.strip()]
+        if lines:
+            msg = lines[0]
+            if len(lines) > 1:
+                msg = f"{msg} | {lines[1]}"
+        else:
+            msg = repr(e)
+        if len(msg) > 80:
+            msg = msg[:77] + "..."
         return "FAILED", msg
 
 
