@@ -54,11 +54,14 @@ def execute_notebook(input_path, output_path, cwd=None, params=None):
         return "PASSED", ""
 
     except Exception as e:
-        lines = [line for line in str(e).splitlines() if line.strip()]
-        if lines:
-            msg = lines[0]
-            if len(lines) > 1:
-                msg = f"{msg} | {lines[1]}"
+        lines = [line.strip() for line in str(e).splitlines() if line.strip()]
+        # Skip any lines that are just a separator or uninformative
+        meaningful_lines = [l for l in lines if l and not all(c == "-" for c in l)]
+        if meaningful_lines:
+            msg = meaningful_lines[0]
+            if len(meaningful_lines) > 1 and len(msg) < 15:
+                # If the message is very short, add more context
+                msg = f"{msg} | {meaningful_lines[1]}"
         else:
             msg = repr(e)
         if len(msg) > 80:
