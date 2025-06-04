@@ -54,19 +54,28 @@ def execute_notebook(input_path, output_path, cwd=None, params=None):
         return "PASSED", ""
 
     except Exception as e:
+        # Get exception class
+        ex_class = e.__class__.__name__
+        # Split lines and clean up
         lines = [line.strip() for line in str(e).splitlines() if line.strip()]
-        # Skip any lines that are just a separator or uninformative
-        meaningful_lines = [l for l in lines if l and not all(c == "-" for c in l)]
-        if meaningful_lines:
-            msg = meaningful_lines[0]
-            if len(meaningful_lines) > 1 and len(msg) < 15:
-                # If the message is very short, add more context
-                msg = f"{msg} | {meaningful_lines[1]}"
-        else:
-            msg = repr(e)
-        if len(msg) > 80:
-            msg = msg[:77] + "..."
-        return "FAILED", msg
+        # Skip separator lines
+        meaningful = [l for l in lines if l and not all(c == "-" for c in l)]
+        # Find the first message line *after* any "Exception encountered at" header
+        msg = ""
+        for i, l in enumerate(meaningful):
+            if "Exception encountered at" in l and i + 1 < len(meaningful):
+                msg = meaningful[
+                    i + 1
+                ]  # The next line should be the actual error message
+                break
+        if not msg:
+            # Fallback: take the first non-separator line
+            msg = meaningful[0] if meaningful else repr(e)
+        # Combine class and message
+        full_msg = f"{ex_class}: {msg}"
+        if len(full_msg) > 80:
+            full_msg = full_msg[:77] + "..."
+        return "FAILED", full_msg
 
 
 def get_ordered_ipynbs_in_dir(dirpath):
