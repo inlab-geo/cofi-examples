@@ -65,7 +65,7 @@ def summarise_warnings(warnings_in_nb, maxlen=80):
 
 
 def summarise_exception_message(e, maxlen=90):
-    """Extract and format the most relevant exception info for reporting."""
+    """Extract and format the exception info."""
     ex_class = e.__class__.__name__
     lines = [
         line.strip()
