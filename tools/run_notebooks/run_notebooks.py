@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     report_path = os.path.join(current_dir, "notebook_execution_report.md")
     with open(report_path, "w") as f:
-        f.write("# Notebook Execution Report\n\n")
+        f.write("# CoFI-Examples Execution Report\n\n")
         for dir_name in sorted(report_rows_by_dir):
             f.write(f"## {dir_name}\n\n")
             f.write("| Notebook | Status | Message |\n")
