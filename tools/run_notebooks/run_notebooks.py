@@ -1,10 +1,12 @@
 from collections import defaultdict
 import nbformat
 import os
-from pathlib import Path
 import papermill as pm
+from pathlib import Path
+import re
 import sys
-import warnings
+import textwrap
+import traceback
 
 
 current_dir = Path(__file__).resolve().parent
@@ -13,6 +15,20 @@ EXAMPLES = "examples"
 EXAMPLES_DIR = str(root_dir / EXAMPLES)
 TUTORIALS = "tutorials"
 TUTORIALS_DIR = str(root_dir / TUTORIALS)
+# Regex for a typical Python warning line: "/some/path/file.py:123: UserWarning: message"
+_WARN_LINE = re.compile(
+    r"""
+    (?P<path> /[^:]+ ) :          # absolute path up to colon
+    (?P<lineno> \d+ ) :\s*        # line number
+    (?P<wclass> \w*Warning ) :\s* # Warning class
+    (?P<msg> .*?)\s*$             # the actual message
+    """,
+    re.VERBOSE,
+)
+# Regex for absolute paths (as fallback)
+_PATH_RE = re.compile(r"(/[^/: ]+)+")
+# For lines that start with just a filename
+_FILE_AT_START_RE = re.compile(r"^\w+\.py\s*")
 
 
 def execute_notebook(input_path, output_path, cwd=None, params=None):
@@ -56,47 +72,63 @@ def extract_warnings_from_notebook(nb_path):
     return sorted(warnings_found)
 
 
-def summarise_warnings(warnings_in_nb, maxlen=80):
-    """Return a compact string of unique warning messages."""
-    msg = "; ".join(warnings_in_nb)
+def summarise_warnings(warnings_in_nb, *, maxlen: int = 150):
+    """
+    Return a compact string of unique warning messages (all noise removed).
+    """
+    cleaned = [_strip_noise(w) for w in warnings_in_nb]
+    uniq = list(dict.fromkeys(cleaned))  # preserves order, removes duplicates
+    msg = "; ".join(uniq)
     if len(msg) > maxlen:
         msg = msg[: maxlen - 3] + "..."
     return msg
 
 
-def summarise_exception_message(e, maxlen=90):
-    """Extract and format the exception info."""
-    ex_class = e.__class__.__name__
-    lines = [
-        line.strip()
-        for line in str(e).splitlines()
-        if line.strip() and not line.strip().startswith("Traceback")
-    ]
-    # Prefer an underlying Python error (e.g., ModuleNotFoundError: ...)
-    py_err_line = None
-    for l in lines:
-        if ":" in l and not l.startswith("Exception encountered"):
-            py_err_line = l
+def _strip_noise(msg: str) -> str:
+    """Clean up a message, removing noise from warnings and paths."""
+    # Try to match and extract message from a typical warning line
+    m = _WARN_LINE.match(msg.strip())
+    if m:
+        return m.group("msg")
+    # Fallback: remove :123: UserWarning: from the middle (rare)
+    msg = re.sub(r":\d+:\s*\w*Warning:\s*", "", msg)
+    # Replace absolute paths with basenames
+    msg = _PATH_RE.sub(lambda m: Path(m.group(0)).name, msg)
+    # Remove filename at start, e.g. "foo.py: message"
+    msg = _FILE_AT_START_RE.sub("", msg)
+    return " ".join(msg.split())
+
+
+def _deepest_relevant(exc: BaseException) -> BaseException:
+    """Follow __cause__/__context__ to the root exception."""
+    while True:
+        if exc.__cause__ is not None:
+            exc = exc.__cause__
+        elif exc.__context__ is not None and not exc.__suppress_context__:
+            exc = exc.__context__
+        else:
+            return exc
+
+
+def summarise_exception_message(exc: BaseException, *, maxlen: int = 150) -> str:
+    """
+    One-line summary of *exc*, truncated to *maxlen*.
+    Works for ordinary exceptions, Papermill wrappers, SQLAlchemy wrappers, etc.
+    """
+    exc = _deepest_relevant(exc)
+
+    # Generic “wrapper carries strings” case (Papermill, SQLAlchemy, etc)
+    for a, b in (("ename", "evalue"), ("orig", "statement")):
+        if hasattr(exc, a) and hasattr(exc, b):
+            msg = f"{getattr(exc, a)}: {getattr(exc, b)}"
             break
-    if py_err_line:
-        msg = py_err_line
-    elif lines:
-        msg = lines[0]
-        if len(lines) > 1 and (msg.endswith("Error") or msg.endswith("Exception")):
-            msg += f": {lines[1]}"
     else:
-        msg = repr(e)
-    # For PapermillExecutionError, prefer the most informative line at the end
-    if "PapermillExecutionError" in ex_class and "Traceback" in str(e):
-        for l in reversed(lines):
-            if ":" in l and not l.startswith("Traceback"):
-                msg = l
-                break
-    msg = f"{ex_class}: {msg}"
-    msg = " ".join(msg.split())  # Collapse internal whitespace
-    if len(msg) > maxlen:
-        msg = msg[: maxlen - 3] + "..."
-    return msg
+        # Fall back to traceback’s own single-line rendering
+        tb = traceback.TracebackException.from_exception(exc, capture_locals=False)
+        msg = "".join(tb.format_exception_only()).strip()
+
+    msg = _strip_noise(msg)
+    return textwrap.shorten(msg, width=maxlen, placeholder="…")
 
 
 def get_ordered_ipynbs_in_dir(dirpath):
