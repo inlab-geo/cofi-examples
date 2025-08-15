@@ -1,6 +1,0 @@
-title: Modified Himmelblau function
-application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Applied mathematics -> Optimisation -> Metaheuristic optimisation
-description: Finding the global minimum of a modified Himmelblau function
-method:
-  modified_himmelblau.ipynb:
-    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> cofi.border_collie_optimization -> Border Collie Optimization Algorithm
