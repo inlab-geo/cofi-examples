@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from astroquery.jplhorizons import Horizons        
-from Finding_Neptune_Inversions.setup_inversion import get_inversion_indices, set_true_m, unscale_param, get_param_bounds, get_starting_points, get_param_scales, set_initial_conditions, get_arrow_data
+from setup_inversion import get_inversion_indices, set_true_m, unscale_param, get_param_bounds, get_starting_points, get_param_scales, set_initial_conditions, get_arrow_data
 
 warnings.filterwarnings('ignore')
 
