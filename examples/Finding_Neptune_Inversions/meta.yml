@@ -1,0 +1,13 @@
+title: Neptune discovery
+application domain: CoFI Examples -> PHYSICAL SCIENCES -> Astronomical sciences  -> Planetary science -> Neptune discovery
+description: Discovery of Neptune using the trajectory of Uranus
+method:
+  finding_neptune_via_deterministic_inv.ipynb:
+    description: "Deterministic inference of Neptune's parameters (mass, velocity components, and position coordinates) by modeling Uranus's trajectory with and without Neptune's influence."
+    methods:
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> lm
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> trf
+  finding_neptune_via_bayesian_inv.ipynb:
+    description: "Bayesian inference of Neptune's parameters (mass, velocity components, and position coordinates) by modeling Uranus's trajectory with and without Neptune's influence."
+    methods:
+      - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
