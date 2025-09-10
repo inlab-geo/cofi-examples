@@ -1,0 +1,12 @@
+title: Metaheuristic optimization algorithm tests
+application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Applied mathematics -> Optimisation -> Metaheuristic optimisation
+description: Finding the global minimum of a modified Himmelblau function
+method:
+  border_collie_algorithm_demo.ipynb:
+  description: Demonstration of Border Collie optimization via minimization a modified Himmelblau function
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> cofi.border_collie_optimization -> Border Collie Optimization Algorithm
+  slime_mould_algorithm_demo.ipynb:
+  description: Demonstration of Slime Mould Algorithm via minimization a modified Himmelblau function
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> cofi.mealpy_sma -> Slime Mould Optimization Algorithm (SMA)
