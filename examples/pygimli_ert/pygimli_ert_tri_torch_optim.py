@@ -32,7 +32,8 @@ scheme = survey_scheme()
 
 # create simulation mesh and true model
 mesh, rhomap = model_true(scheme)
-ax = pygimli.show(mesh, data=rhomap, label="$\Omega m$", showMesh=True)
+rho_true = model_vec(rhomap, mesh)
+ax = pygimli.show(mesh, data=rho_true, label="$\Omega m$", showMesh=True)
 ax[0].set_title("True model")
 ax[0].figure.savefig("figs/tri_mesh/tri_torch_optim_model_true")
 
