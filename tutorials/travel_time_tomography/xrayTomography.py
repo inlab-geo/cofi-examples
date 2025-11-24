@@ -98,7 +98,7 @@ def pngToModel(pngfile,nx,ny,bg=1.,sc=1.):
     model = sc*(bg+np.asarray(png.convert('L').resize((nx,ny)).transpose(Image.ROTATE_270))/255.)
     return model
 
-def displayModel(model,paths=None,extent=(0,1,0,1),clim=None,cmap=None,figsize=(6,6),title=None):
+def displayModel(model,paths=None,extent=(0,1,0,1),clim=None,cmap=None,figsize=(6,6),title=None,filename=None):
     plt.figure(figsize=figsize)
     if cmap is None: cmap = plt.cm.bone_r
 
@@ -112,6 +112,7 @@ def displayModel(model,paths=None,extent=(0,1,0,1),clim=None,cmap=None,figsize=(
     if title is not None: plt.title(title)
     plt.colorbar()
 
+    if filename is not None: plt.savefig(filename)
     plt.show()
 
 
