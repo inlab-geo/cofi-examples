@@ -7,10 +7,25 @@ Shibutani, T., Kennett, B. and Sambridge, M., Geophys. Res. Lett., 23 , No. 4, 1
 
 In order to better understand the complexity and non-linear nature of seismic receiver function inversion, we have included a few illustrative animations. These animations highlight the substantial influence of velocities and, more prominently, interface depths on the resulting receiver functions.
 
-![depth_layer3_anim4.gif](https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/depth_layer3_anim4.gif?raw=true)
-
-![vel_layer3_anim4_400f.gif](https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/vel_layer3_anim4_400f.gif?raw=true)
-
 This is a non-linear problem which can be highly sensitive to the starting model. 
 
-![3Dsurf_x40y10_v55_l270_35](https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/3Dsurf_x40y10_v55_l270_35.png?raw=true)
+
+<figure>
+    <img src="https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/depth_layer3_anim4.gif?raw=true"
+         alt="Animation of Receiver function misfit surface" width="600"/>
+    <figcaption>Animation showing variation of Receiver function misfit with a change in layer thicknesses and velocities. Here the misfit is multi-modal.</figcaption>
+</figure>
+
+<figure>
+    <img src="https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/vel_layer3_anim4_400f.gif?raw=true"
+         alt="Animation of Receiver function misfit surface" width="600"/>
+    <figcaption>Animation showing variation of Receiver function misfit with a change of velocity with a single layer. Here the misfit is near quadratic.</figcaption>
+</figure>
+
+
+
+<figure>
+    <img src="https://github.com/inlab-geo/cofi-examples/blob/main/theory/illustrations/3Dsurf_x40y10_v55_l270_35.png?raw=true"
+         alt="Receiver function misfit surface" width="600"/>
+    <figcaption>A misfit function showing similarity between a predicted and observed Receiver function.</figcaption>
+</figure>
