@@ -26,3 +26,9 @@ sample results.
     with the difference that they use a rectangular mesh for inversion, instead of a triangular one.
 - `figs` folder contains all the sample results from running the scripts listed above.
 
+### pyGIMLi notebooks (Python compatibility)
+
+Some notebooks depend on **pyGIMLi (pygimli)**. At the time of writing, pyGIMLi’s compiled core (`pgcore`) does not provide wheels for **Python 3.13**, so these notebooks will not run on 3.13 unless you build from source.
+
+**Recommended:** use Python **3.12** (or 3.11) for pyGIMLi-based notebooks.  
+**Alternative:** build pyGIMLi/pgcore from source (advanced).
