@@ -7,7 +7,7 @@ import re
 import sys
 import textwrap
 import traceback
-
+import shutil
 
 current_dir = Path(__file__).resolve().parent
 root_dir = current_dir.parent.parent
@@ -15,6 +15,7 @@ EXAMPLES = "examples"
 EXAMPLES_DIR = str(root_dir / EXAMPLES)
 TUTORIALS = "tutorials"
 TUTORIALS_DIR = str(root_dir / TUTORIALS)
+FAILED_DIR = current_dir / "failed_notebooks"
 # Regex for a typical Python warning line: "/some/path/file.py:123: UserWarning: message"
 _WARN_LINE = re.compile(
     r"""
@@ -30,6 +31,19 @@ _PATH_RE = re.compile(r"(/[^/: ]+)+")
 # For lines that start with just a filename
 _FILE_AT_START_RE = re.compile(r"^\w+\.py\s*")
 
+def save_failed_notebook(nb_path, status):
+    """Copy failed notebooks for debugging"""
+    if status != "FAILED":
+        return
+    #Preserve subdirectory structure
+    nb_path= Path(nb_path)
+    subdir = nb_path.parent.name
+    dest_dir = FAILED_DIR / subdir
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    
+    dest_path = dest_dir / nb_path.name
+    shutil.copy2(nb_path, dest_path)
+    print(f" -> Saved to {dest_path.relative_to(current_dir)}")
 
 def execute_notebook(input_path, output_path, cwd=None, params=None):
     """
@@ -210,15 +224,18 @@ if __name__ == "__main__":
 
     # Dictionary: {dir_name: [(nb_name, badge, msg), ...]}
     report_rows_by_dir = defaultdict(list)
+    if FAILED_DIR.exists():
+        shutil.rmtree(FAILED_DIR)
 
     for nb in all_examples:
         print(f"file: {nb}")
         path = nb[: nb.rfind("/")]
         status, msg = execute_notebook(nb, nb, cwd=path)
+        save_failed_notebook(nb, status)
         badge = status_badge(status)
         dir_name = os.path.basename(path)
         nb_name = os.path.basename(nb)
-        report_rows_by_dir[dir_name].append((nb_name, badge, msg))
+        report_rows_by_dir[dir_name].append((nb_name, badge, msg, status))
 
     report_path = os.path.join(current_dir, "notebook_execution_report.md")
     with open(report_path, "w") as f:
@@ -227,7 +244,11 @@ if __name__ == "__main__":
             f.write(f"## {dir_name}\n\n")
             f.write("| Notebook | Status | Message |\n")
             f.write("|---|:---:|---|\n")
-            for nb_name, badge, msg in report_rows_by_dir[dir_name]:
-                f.write(f"| `{nb_name}` | {badge} | {msg} |\n")
+            for nb_name, badge, msg, status in report_rows_by_dir[dir_name]:
+                if status == 'FAILED':
+                    nb_link = f"[{nb_name}](failed_notebooks/{dir_name}/{nb_name})"
+                else:
+                    nb_link = nb_name
+                f.write(f"| {nb_link} | {badge} | {msg} |\n")
             f.write("\n")
     print(f"\nExecution complete. Report written to {report_path}")
