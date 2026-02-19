@@ -129,8 +129,8 @@ def main(output_dir="."):
         bounds=bounds_dv,
         initial_ensemble=ds_samples,
         log_ppd=log_ppd,
-        n_resample=50000,
-        n_walkers=10,
+        n_resample=20000,
+        n_walkers=4,
     )
     if show_summary:
         inv_options_app.summary()
@@ -205,6 +205,11 @@ def main(output_dir="."):
             fig3.savefig(f"{_figs_prefix}_data")
 
         # Plot 4: 8x8 corner plot
+        print(
+            "\nNote: generating the 8x8 corner plot over 50,000 samples may take "
+            "several minutes.\nTo skip all plots, re-run with: "
+            "python receiver_function_neighpy.py --no-save-plot --no-show-plot"
+        )
         n_params = 8
         var_names = ["d1", "Vs1", "d2", "Vs2", "d3", "Vs3", "d4", "Vs4"]
         fig4, axes = plt.subplots(n_params, n_params, figsize=(12, 12),
