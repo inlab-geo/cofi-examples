@@ -10,3 +10,11 @@ method:
   description: Demonstration of Slime Mould Algorithm via minimization a modified Himmelblau function
     methods:
     - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> cofi.mealpy_sma -> Slime Mould Optimization Algorithm (SMA)
+  rosenbrock_neighpy.ipynb:
+    description: Demonstrates Neighbourhood Algorithm applied to Rosenbrock function via direct search, appraisal, and combined phases.
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm
+  rosenbrock_neighpy.py:
+    description: Script demonstrating Neighbourhood Algorithm for direct search and appraisal applied to the Rosenbrock function.
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm

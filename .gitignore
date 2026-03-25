@@ -1,6 +1,7 @@
 # Editor / OS related
 .vscode
 .DS_Store
+CLAUDE.md
 
 # Python related
 .ipynb_checkpoints

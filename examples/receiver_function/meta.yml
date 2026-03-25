@@ -5,3 +5,11 @@ method:
   receiver_function_inversion.ipynb:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Nelder-Mead
     - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+  receiver_function_neighpy.ipynb:
+    description: Demonstrates Neighbourhood Algorithm applied to receiver function inversion via direct search and appraisal.
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm
+  receiver_function_neighpy.py:
+    description: Script demonstrating Neighbourhood Algorithm for receiver function inversion.
+    methods:
+    - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> Neighpy -> Neighbourhood Algorithm
