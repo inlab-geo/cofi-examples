@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime, timezone
 import nbformat
 import os
 import papermill as pm
@@ -238,8 +239,10 @@ if __name__ == "__main__":
         report_rows_by_dir[dir_name].append((nb_name, badge, msg, status))
 
     report_path = os.path.join(current_dir, "notebook_execution_report.md")
+    run_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     with open(report_path, "w") as f:
         f.write("# CoFI-Examples Execution Report\n\n")
+        f.write(f"**Run:** {run_ts}\n\n")
         for dir_name in sorted(report_rows_by_dir):
             f.write(f"## {dir_name}\n\n")
             f.write("| Notebook | Status | Message |\n")
