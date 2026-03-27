@@ -1,0 +1,9 @@
+title: Variational Inference
+application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Statistics -> Bayesian inference -> Variational inference
+description: Bayesian posterior approximation using natural-gradient Gaussian VI with optional sinh-arcsinh normalising flow
+method:
+  variational_inference.ipynb:
+    description: Tutorial on variational inference comparing Laplace approximation, Gaussian VI, and sinh-arcsinh flow approaches on a nonlinear inverse problem
+    methods:
+      - CoFI -> Ensemble methods -> Variational inference -> cofi.gaussian_vi -> Gaussian VI
+      - CoFI -> Ensemble methods -> Variational inference -> cofi.gaussian_vi -> SAS flow
