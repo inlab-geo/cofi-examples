@@ -26,7 +26,7 @@ method:
   three_survey_lines_smt_emcee.ipynb:
     description: Inverting for a thin plate target using emcee
     methods:
-   - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+    - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
   three_survey_lines_smt_neighpy.ipynb:
     description: Inverting for a thin plate target using neighpy
     methods:
