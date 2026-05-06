@@ -1,0 +1,31 @@
+name: Validate meta.yml files
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate example metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cofi-examples
+        uses: actions/checkout@v4
+
+      - name: Checkout CoFI
+        uses: actions/checkout@v4
+        with:
+          repository: inlab-geo/cofi
+          path: cofi
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install validator dependencies
+        run: |
+          python -m pip install pyyaml
+
+      - name: Validate meta.yml files
+        run: |
+          python tools/validation/validate_meta_yml.py --cofi-tools ./cofi/src/cofi/tools
