@@ -20,21 +20,33 @@ def run_cofi_emcee(
     Inversion,
     progress=False,
     use_pool=False,
+    n_threads=8,
+    moves = None,
+    skip_initial_state_check=False,
 ):
-    """Run a short CoFI/emcee inversion, optionally with multiprocessing."""
+    """Run a CoFI/emcee inversion, optionally with a thread pool.
+
+    Uses ThreadPool rather than mp.Pool: the @njit forward model releases
+    the GIL, so threads run truly in parallel with zero pickle/IPC overhead.
+    n_threads controls how many threads to use (default 8).
+    """
     params = {
         "nwalkers": n_walkers,
         "nsteps": nsteps,
         "initial_state": walkers_start,
         "progress": progress,
     }
+    if moves is not None:
+        params["moves"] = moves
+
+    params["skip_initial_state_check"] = skip_initial_state_check
+
 
     start = time.time()
     if use_pool:
-        import multiprocessing as mp
+        from multiprocessing.pool import ThreadPool
 
-        mp.set_start_method("fork", force=True)
-        with mp.Pool() as pool:
+        with ThreadPool(processes=n_threads) as pool:
             params["pool"] = pool
             inv_options = InversionOptions()
             inv_options.set_tool("emcee")

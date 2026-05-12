@@ -88,8 +88,147 @@ def rk4_step(pos : np.ndarray, vel : np.ndarray, masses : np.ndarray, dt : float
     
     new_pos = pos + dt * (v1 + 2.0*v2 + 2.0*v3 + v4) / 6.0
     new_vel = vel + dt * (a1 + 2.0*a2 + 2.0*a3 + a4) / 6.0
-    
+
     return new_pos, new_vel
+
+@njit(fastmath=True, cache=True, nogil=True)
+def _accel_into(pos, masses, acc):
+    # Newton's 3rd law: each pair computed once, force applied symmetrically.
+    n = pos.shape[0]
+    G = 0.0002959122082855911
+    for i in range(n):
+        acc[i, 0] = 0.0; acc[i, 1] = 0.0; acc[i, 2] = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            dx = pos[j, 0] - pos[i, 0]
+            dy = pos[j, 1] - pos[i, 1]
+            dz = pos[j, 2] - pos[i, 2]
+            r_sq = dx*dx + dy*dy + dz*dz + 1e-12
+            inv_r3 = 1.0 / (r_sq * np.sqrt(r_sq))
+            f = G * inv_r3
+            acc[i, 0] += f * masses[j] * dx
+            acc[i, 1] += f * masses[j] * dy
+            acc[i, 2] += f * masses[j] * dz
+            acc[j, 0] -= f * masses[i] * dx
+            acc[j, 1] -= f * masses[i] * dy
+            acc[j, 2] -= f * masses[i] * dz
+
+@njit(fastmath=True, cache=True, nogil=True)
+def integrate_uranus(pos0, vel0, masses, num_steps, uranus_idx, dt, sample_every):
+    # Fused RK4 integrator: runs the full integration in one numba call,
+    # returns Uranus positions sampled every `sample_every` steps.
+    n = pos0.shape[0]
+    n_out = num_steps // sample_every + 1
+    out = np.zeros((n_out, 3))
+    out[0, 0] = pos0[uranus_idx, 0]
+    out[0, 1] = pos0[uranus_idx, 1]
+    out[0, 2] = pos0[uranus_idx, 2]
+    pos = pos0.copy(); vel = vel0.copy()
+    a1 = np.zeros((n, 3)); a2 = np.zeros((n, 3))
+    a3 = np.zeros((n, 3)); a4 = np.zeros((n, 3))
+    p2 = np.zeros((n, 3)); p3 = np.zeros((n, 3)); p4 = np.zeros((n, 3))
+    v2 = np.zeros((n, 3)); v3 = np.zeros((n, 3)); v4 = np.zeros((n, 3))
+    k = 1
+    for step in range(1, num_steps + 1):
+        _accel_into(pos, masses, a1)
+        for i in range(n):
+            p2[i, 0] = pos[i, 0] + 0.5*dt*vel[i, 0]
+            p2[i, 1] = pos[i, 1] + 0.5*dt*vel[i, 1]
+            p2[i, 2] = pos[i, 2] + 0.5*dt*vel[i, 2]
+            v2[i, 0] = vel[i, 0] + 0.5*dt*a1[i, 0]
+            v2[i, 1] = vel[i, 1] + 0.5*dt*a1[i, 1]
+            v2[i, 2] = vel[i, 2] + 0.5*dt*a1[i, 2]
+        _accel_into(p2, masses, a2)
+        for i in range(n):
+            p3[i, 0] = pos[i, 0] + 0.5*dt*v2[i, 0]
+            p3[i, 1] = pos[i, 1] + 0.5*dt*v2[i, 1]
+            p3[i, 2] = pos[i, 2] + 0.5*dt*v2[i, 2]
+            v3[i, 0] = vel[i, 0] + 0.5*dt*a2[i, 0]
+            v3[i, 1] = vel[i, 1] + 0.5*dt*a2[i, 1]
+            v3[i, 2] = vel[i, 2] + 0.5*dt*a2[i, 2]
+        _accel_into(p3, masses, a3)
+        for i in range(n):
+            p4[i, 0] = pos[i, 0] + dt*v3[i, 0]
+            p4[i, 1] = pos[i, 1] + dt*v3[i, 1]
+            p4[i, 2] = pos[i, 2] + dt*v3[i, 2]
+            v4[i, 0] = vel[i, 0] + dt*a3[i, 0]
+            v4[i, 1] = vel[i, 1] + dt*a3[i, 1]
+            v4[i, 2] = vel[i, 2] + dt*a3[i, 2]
+        _accel_into(p4, masses, a4)
+        for i in range(n):
+            pos[i, 0] += dt*(vel[i, 0] + 2.0*v2[i, 0] + 2.0*v3[i, 0] + v4[i, 0]) / 6.0
+            pos[i, 1] += dt*(vel[i, 1] + 2.0*v2[i, 1] + 2.0*v3[i, 1] + v4[i, 1]) / 6.0
+            pos[i, 2] += dt*(vel[i, 2] + 2.0*v2[i, 2] + 2.0*v3[i, 2] + v4[i, 2]) / 6.0
+            vel[i, 0] += dt*(a1[i, 0] + 2.0*a2[i, 0] + 2.0*a3[i, 0] + a4[i, 0]) / 6.0
+            vel[i, 1] += dt*(a1[i, 1] + 2.0*a2[i, 1] + 2.0*a3[i, 1] + a4[i, 1]) / 6.0
+            vel[i, 2] += dt*(a1[i, 2] + 2.0*a2[i, 2] + 2.0*a3[i, 2] + a4[i, 2]) / 6.0
+        if step % sample_every == 0 and k < n_out:
+            out[k, 0] = pos[uranus_idx, 0]
+            out[k, 1] = pos[uranus_idx, 1]
+            out[k, 2] = pos[uranus_idx, 2]
+            k += 1
+    return out
+
+
+@njit(fastmath=True, cache=True, nogil=True)
+def integrate_all_bodies(pos0, vel0, masses, num_steps, dt, sample_every):
+    # Fused @njit RK4 integrator: same physics as integrate_uranus but stores
+    # the positions of every body at each sample step. Output shape
+    # (num_samples, n_bodies, 3).
+    n = pos0.shape[0]
+    n_out = num_steps // sample_every + 1
+    out = np.zeros((n_out, n, 3))
+    for i in range(n):
+        out[0, i, 0] = pos0[i, 0]
+        out[0, i, 1] = pos0[i, 1]
+        out[0, i, 2] = pos0[i, 2]
+    pos = pos0.copy(); vel = vel0.copy()
+    a1 = np.zeros((n, 3)); a2 = np.zeros((n, 3))
+    a3 = np.zeros((n, 3)); a4 = np.zeros((n, 3))
+    p2 = np.zeros((n, 3)); p3 = np.zeros((n, 3)); p4 = np.zeros((n, 3))
+    v2 = np.zeros((n, 3)); v3 = np.zeros((n, 3)); v4 = np.zeros((n, 3))
+    k = 1
+    for step in range(1, num_steps + 1):
+        _accel_into(pos, masses, a1)
+        for i in range(n):
+            p2[i, 0] = pos[i, 0] + 0.5*dt*vel[i, 0]
+            p2[i, 1] = pos[i, 1] + 0.5*dt*vel[i, 1]
+            p2[i, 2] = pos[i, 2] + 0.5*dt*vel[i, 2]
+            v2[i, 0] = vel[i, 0] + 0.5*dt*a1[i, 0]
+            v2[i, 1] = vel[i, 1] + 0.5*dt*a1[i, 1]
+            v2[i, 2] = vel[i, 2] + 0.5*dt*a1[i, 2]
+        _accel_into(p2, masses, a2)
+        for i in range(n):
+            p3[i, 0] = pos[i, 0] + 0.5*dt*v2[i, 0]
+            p3[i, 1] = pos[i, 1] + 0.5*dt*v2[i, 1]
+            p3[i, 2] = pos[i, 2] + 0.5*dt*v2[i, 2]
+            v3[i, 0] = vel[i, 0] + 0.5*dt*a2[i, 0]
+            v3[i, 1] = vel[i, 1] + 0.5*dt*a2[i, 1]
+            v3[i, 2] = vel[i, 2] + 0.5*dt*a2[i, 2]
+        _accel_into(p3, masses, a3)
+        for i in range(n):
+            p4[i, 0] = pos[i, 0] + dt*v3[i, 0]
+            p4[i, 1] = pos[i, 1] + dt*v3[i, 1]
+            p4[i, 2] = pos[i, 2] + dt*v3[i, 2]
+            v4[i, 0] = vel[i, 0] + dt*a3[i, 0]
+            v4[i, 1] = vel[i, 1] + dt*a3[i, 1]
+            v4[i, 2] = vel[i, 2] + dt*a3[i, 2]
+        _accel_into(p4, masses, a4)
+        for i in range(n):
+            pos[i, 0] += dt*(vel[i, 0] + 2.0*v2[i, 0] + 2.0*v3[i, 0] + v4[i, 0]) / 6.0
+            pos[i, 1] += dt*(vel[i, 1] + 2.0*v2[i, 1] + 2.0*v3[i, 1] + v4[i, 1]) / 6.0
+            pos[i, 2] += dt*(vel[i, 2] + 2.0*v2[i, 2] + 2.0*v3[i, 2] + v4[i, 2]) / 6.0
+            vel[i, 0] += dt*(a1[i, 0] + 2.0*a2[i, 0] + 2.0*a3[i, 0] + a4[i, 0]) / 6.0
+            vel[i, 1] += dt*(a1[i, 1] + 2.0*a2[i, 1] + 2.0*a3[i, 1] + a4[i, 1]) / 6.0
+            vel[i, 2] += dt*(a1[i, 2] + 2.0*a2[i, 2] + 2.0*a3[i, 2] + a4[i, 2]) / 6.0
+        if step % sample_every == 0 and k < n_out:
+            for i in range(n):
+                out[k, i, 0] = pos[i, 0]
+                out[k, i, 1] = pos[i, 1]
+                out[k, i, 2] = pos[i, 2]
+            k += 1
+    return out
+
 
 def run_simulation(initial_conditions: dict = None, T: float = 10, dt: float = 1, plot : bool = True, plot_only : list = None):
     """
@@ -145,17 +284,14 @@ def run_simulation(initial_conditions: dict = None, T: float = 10, dt: float = 1
     # Distribute momentum correction proportionally to masses
     velocities -= total_momentum / np.sum(masses)
 
+    # Run the fused @njit integrator. num_steps + 1 = total samples (initial + post-step).
     num_steps = int(365 * T / dt)  # T=190 years, dt=1 day -> 69,350 steps
-    trajectories = {name: [] for name in names}
-    for i, name in enumerate(names):
-        trajectories[name].append(positions[i].copy())
-    for _ in tqdm(range(num_steps), desc='Computing trajectories...'):
-        positions, velocities = rk4_step(positions, velocities, masses, dt)
-        for i, name in enumerate(names):
-            trajectories[name].append(positions[i].copy())
-    
-    for name in names:
-        trajectories[name] = np.array(trajectories[name])
+    sample_every = 1
+    all_traj = integrate_all_bodies(
+        positions, velocities, masses,
+        num_steps, float(dt), sample_every,
+    )
+    trajectories = {name: all_traj[:, i, :].copy() for i, name in enumerate(names)}
         
     if plot:    
         plt.figure(figsize=(7, 7))
@@ -308,25 +444,16 @@ def predict_U(m, T : int = 190, dt : float = 1, z_scale_factor : int = 1) -> np.
     velocities[0] = -total_momentum / masses[0]
     com = np.sum(masses[:, None] * positions, axis=0) / np.sum(masses)
     positions -= com
-    
-    uranus_positions = []
+
     uranus_idx = names.index('Uranus')
-    
-    t_days = 365 * T 
-    num_steps = int(t_days / dt) - 1
-    
-    uranus_positions.append(positions[uranus_idx].copy())
-    
-    for step in range(num_steps):
-        positions, velocities = rk4_step(positions, velocities, masses, dt)
-        uranus_positions.append(positions[uranus_idx].copy())
-    
-    uranus_positions = np.array(uranus_positions)
-    sampled = uranus_positions[::365]
+    num_steps = int(365 * T / dt) - 1
+    sample_every = int(365 / dt)
+
+    sampled = integrate_uranus(positions, velocities, masses, num_steps, uranus_idx, float(dt), sample_every)
     x_pred = sampled[:, 0]
     y_pred = sampled[:, 1]
     z_pred = sampled[:, 2] * z_scale_factor
-    
+
     return np.concatenate([x_pred, y_pred, z_pred])
 
 def residual(m, U_true, alpha : float = 0, T : int = 190, dt : float = 1):
@@ -362,7 +489,7 @@ def jacobian(m, U_true, alpha : float = 0, T : int = 190, dt : float = 1):
         The first T elements correspond to the X component, the next T to Y, and the last T to Z.
     """
     
-    epsilon = 1e-12
+    epsilon = 1e-8
     m_array = np.atleast_1d(m)
     J = np.zeros((len(U_true), len(m_array)), dtype=np.float64)
     U_base = predict_U(m, T=T, dt=dt)
@@ -378,6 +505,62 @@ def jacobian(m, U_true, alpha : float = 0, T : int = 190, dt : float = 1):
     # print(np.diag(J.T @ J))       # Uncomment to see diagonal of J.T@J
     # print(f"Jacobian condition number: {np.linalg.cond(J.T@J):.2e}")  # Uncomment to see condition number of J.T@J
     return J
+
+
+def residual_weighted(m, U_true, m_ref, reg_weight, alpha: float = 0, T: int = 190, dt: float = 1):
+    """
+    Residual function with Tikhonov regularization centered on a reference point
+    (typically the starting model) and weighted per-parameter so each parameter
+    contributes equally to the regularization term regardless of its scale.
+
+    Parameters
+    ----------
+    m : np.ndarray
+        Current scaled parameter vector.
+    U_true : np.ndarray
+        Observed Uranus trajectory (length 3*T).
+    m_ref : np.ndarray
+        Reference parameter vector to regularize toward (e.g. m_start_scaled).
+    reg_weight : np.ndarray
+        Per-parameter weight vector (length len(m)). Typically 1 / |m_ref| so the
+        regularization residual measures fractional deviation.
+    alpha : float
+        Regularization strength.
+    T, dt : int, float
+        Forward-model arguments.
+
+    Returns
+    -------
+    res : np.ndarray
+        Length 3*T (data residual) when alpha == 0, otherwise length 3*T + len(m)
+        with the weighted Tikhonov residual stacked at the end.
+    """
+    U_pred = predict_U(m, T=T, dt=dt)
+    if alpha > 0:
+        return np.concatenate([U_pred - U_true,
+                               alpha * reg_weight * (m - m_ref)])
+    return U_pred - U_true
+
+
+def jacobian_weighted(m, U_true, m_ref, reg_weight, alpha: float = 0, T: int = 190, dt: float = 1):
+    """
+    Jacobian matching residual_weighted. Forward-difference epsilon = 1e-8
+    (signal-dominated; see notebook). The regularization rows are diag(alpha * reg_weight).
+    """
+    epsilon = 1e-8
+    m_array = np.atleast_1d(m)
+    n_data = len(U_true)
+    J = np.zeros((n_data, len(m_array)), dtype=np.float64)
+    U_base = predict_U(m, T=T, dt=dt)
+    for i in range(len(m_array)):
+        m_plus = m_array.copy()
+        m_plus[i] += epsilon
+        U_plus = predict_U(m_plus, T=T, dt=dt)
+        J[:, i] = (U_plus - U_base) / epsilon
+    if alpha > 0:
+        return np.vstack([J, np.diag(alpha * reg_weight)])
+    return J
+
 
 def set_lcurve_inversion_params() -> tuple:
     '''Set parameters for the L-curve inversion.'''
@@ -461,12 +644,21 @@ def plot_uranus_orbits(predicted_uranus_trajectory, U_true, T, z_scale_factor : 
 def plot_neptune_orbits(result_unscaled, initial_conditions, T, dt):
 
     m_0 = set_true_m()
-    initial_conditions['Neptune'] = result_unscaled
-    synthetic_trajectories = run_simulation(initial_conditions=initial_conditions, T=T, dt=dt, plot=False)
+    result_unscaled = np.asarray(result_unscaled, dtype=np.float64)
+    if result_unscaled.size != m_0.size:
+        neptune_full = m_0.copy()
+        for i, param_idx in enumerate(get_inversion_indices()):
+            neptune_full[param_idx] = result_unscaled[i]
+        result_unscaled = neptune_full
+
+    estimated_initial_conditions = {k: v.copy() for k, v in initial_conditions.items()}
+    estimated_initial_conditions['Neptune'] = result_unscaled
+    synthetic_trajectories = run_simulation(initial_conditions=estimated_initial_conditions, T=T, dt=dt, plot=False)
     synthetic_neptune_data = synthetic_trajectories['Neptune']
 
-    initial_conditions['Neptune'] = np.array([(5.151e-5), *m_0[1:7]], dtype=np.float64)
-    synthetic_trajectories_true = run_simulation(initial_conditions=initial_conditions, T=T, dt=dt, plot=False)
+    true_initial_conditions = {k: v.copy() for k, v in initial_conditions.items()}
+    true_initial_conditions['Neptune'] = np.array([(5.151e-5), *m_0[1:7]], dtype=np.float64)
+    synthetic_trajectories_true = run_simulation(initial_conditions=true_initial_conditions, T=T, dt=dt, plot=False)
     true_neptune_data = synthetic_trajectories_true['Neptune']
 
     num_arrows = 8

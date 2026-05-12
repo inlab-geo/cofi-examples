@@ -1,15 +1,48 @@
 import numpy as np
 
+PARAM_NAMES = ['mass', 'x', 'y', 'z', 'vx', 'vy', 'vz']
+
+
+def _all_starting_points():
+    return np.array([
+        ((1.02e26)/(1.9885e30)),
+        -2.991585533802299E+01,
+        3.1455510809535168E+00,
+        1.050744172524112E-01,
+        -2.804329678559355E-04,
+        -3.11021549555015E-03,
+        4.187313350941659E-05,
+    ], dtype=float)
+
+
+def _all_param_bounds():
+    return np.array([
+        [1e-8, 1e-3],
+        [-50, 50],
+        [-50, 50],
+        [-10, 10],
+        [-0.001, 0.001],
+        [-0.01, 0.01],
+        [-0.001, 0.001],
+    ], dtype=float)
+
+
+def _all_param_scales():
+    # These are based on the diagonal of J.T@J, which gives an idea of the
+    # relative scales of the parameters.
+    return np.sqrt([
+        1.28428575e+01,
+        2.35833841e-02,
+        1.89992459e-02,
+        4.22416638e-01,
+        6.39191788e+05,
+        1.44721770e+06,
+        4.53527575e+03,
+    ])
+
+
 def get_starting_points():
-    STARTING_POINTS = [((1.02e26)/(1.9885e30)), 
-                   -2.991585533802299E+01, 
-                   3.1455510809535168E+00, 
-                   1.050744172524112E-01, 
-                   -2.804329678559355E-04, 
-                   -3.11021549555015E-03, 
-                   4.187313350941659E-05
-                   ]
-    return STARTING_POINTS
+    return _all_starting_points()[get_inversion_indices()].tolist()
 
 def set_true_m():
     m_0 = np.array([
@@ -30,52 +63,17 @@ def get_inversion_indices():
     # INVERT_INDICES = [0, 4, 5, 6]  # Mass + velocities
     # INVERT_INDICES = [1, 2, 3]     # Only position
     INVERT_INDICES = list(range(7)) # All parameters
+    # INVERT_INDICES = [0, 1, 2, 4, 5]
+
 
     return INVERT_INDICES
 
 def get_param_scales():
     """Get the parameter scales for inversion"""
-    
-    # Parameter bounds [lower, upper] for each parameter being inverted, to be used ONLY when using trf method in inversion_options
-    PARAM_BOUNDS = [
-        [1e-8, 1e-3],  
-        [-50, 50],  
-        [-50, 50], 
-        [-10, 10],    
-        [-0.001, 0.001],  
-        [-0.01, 0.01],  
-        [-0.001, 0.001]   
-    ]
-    # CONFIGURATION: Which parameters to invert for (indices: 0=mass, 1=x, 2=y, 3=z, 4=vx, 5=vy, 6=vz)
-    # INVERT_INDICES = [0, 1, 2, 3]  # Mass + position  
-    # INVERT_INDICES = [0, 4, 5, 6]  # Mass + velocities
-    # INVERT_INDICES = [1, 2, 3]     # Only position
-    INVERT_INDICES = get_inversion_indices()
-
-    PARAM_SCALES = []
-
-    # Scaling factors for each parameter to normalize the inversion
-    # These are based on the diagonal of J.T@J, which gives an idea of the relative scales of the parameters.
-
-    S = (np.sqrt([1.28428575e+01, 2.35833841e-02,1.89992459e-02 ,4.22416638e-01
-    ,6.39191788e+05 ,1.44721770e+06, 4.53527575e+03]))
-
-    for i in INVERT_INDICES:
-        PARAM_SCALES.append(S[i])
-        
-    return PARAM_SCALES
+    return _all_param_scales()[get_inversion_indices()].tolist()
 
 def get_param_bounds():
-    PARAM_BOUNDS = [
-    [1e-8, 1e-3],  
-    [-50, 50],  
-    [-50, 50], 
-    [-10, 10],    
-    [-0.001, 0.001],  
-    [-0.01, 0.01],  
-    [-0.001, 0.001]   
-    ]
-    return PARAM_BOUNDS
+    return _all_param_bounds()[get_inversion_indices()].tolist()
 
 def validate_config():
     """Validate that configuration arrays have consistent lengths"""
@@ -90,22 +88,30 @@ def validate_config():
     assert len(PARAM_BOUNDS) == n_params, f"PARAM_BOUNDS length {len(PARAM_BOUNDS)} != INVERT_INDICES length {n_params}"
     assert len(PARAM_SCALES) == n_params, f"PARAM_SCALES length {len(PARAM_SCALES)} != INVERT_INDICES length {n_params}"
     
-    param_names = ['mass', 'x', 'y', 'z', 'vx', 'vy', 'vz']
-    print(f"Inverting for: {[param_names[i] for i in INVERT_INDICES]}")
+    print(f"Inverting for: {[PARAM_NAMES[i] for i in INVERT_INDICES]}")
     print(f"Starting points: {STARTING_POINTS}")
     
 def scale_param(m):
     """Scale parameters - handle both scalar and array inputs"""
     
-    PARAM_SCALES = get_param_scales()
+    INVERT_INDICES = get_inversion_indices()
+    PARAM_SCALES = np.asarray(get_param_scales())
     if np.isscalar(m):
         return PARAM_SCALES[0] * m if len(PARAM_SCALES) == 1 else set_true_m()
     else:
-        m_array = np.asarray(m)
+        m_array = np.asarray(m, dtype=float)
         if m_array.size == 1:
             return PARAM_SCALES[0] * m_array.item()
+        if m_array.size == len(INVERT_INDICES):
+            selected = m_array
+        elif m_array.size == len(PARAM_NAMES):
+            selected = m_array[INVERT_INDICES]
         else:
-            return np.array([PARAM_SCALES[i] * m_array[i] for i in range(len(m_array))])
+            raise ValueError(
+                f"Cannot scale parameter vector of length {m_array.size}; "
+                f"expected {len(INVERT_INDICES)} selected parameters or {len(PARAM_NAMES)} full parameters."
+            )
+        return PARAM_SCALES * selected
 
 def unscale_param(m_scaled):
     """
@@ -116,15 +122,23 @@ def unscale_param(m_scaled):
     m_unscaled : float or np.array
         The unscaled parameters, either as a single float or an array.
     """
-    PARAM_SCALES = get_param_scales()
+    INVERT_INDICES = get_inversion_indices()
+    PARAM_SCALES = np.asarray(get_param_scales())
     if np.isscalar(m_scaled):
         return m_scaled / PARAM_SCALES[0] if len(PARAM_SCALES) == 1 else m_scaled
     else:
-        m_array = np.asarray(m_scaled)
+        m_array = np.asarray(m_scaled, dtype=float)
         if m_array.size == 1:
             return m_array.item() / PARAM_SCALES[0]
-        else:
-            return np.array([m_array[i] / PARAM_SCALES[i] for i in range(len(m_array))])
+        if m_array.size == len(INVERT_INDICES):
+            return m_array / PARAM_SCALES
+        if m_array.size == len(PARAM_NAMES):
+            all_scales = _all_param_scales()
+            return m_array / all_scales
+        raise ValueError(
+            f"Cannot unscale parameter vector of length {m_array.size}; "
+            f"expected {len(INVERT_INDICES)} selected parameters or {len(PARAM_NAMES)} full parameters."
+        )
 
 def set_initial_conditions():
     global initial_conditions

@@ -1,29 +1,30 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from setup_inversion import set_true_m, unscale_param, get_inversion_indices, set_initial_conditions
-from neptune_deterministic_methods import rk4_step
+from neptune_deterministic_methods import integrate_uranus
 
 def build_neptune_vector(inverted_params_scaled):
     """
     Build full Neptune parameter vector from inverted parameters and m_0
-    
+
     Args:
         inverted_params_scaled: The parameters being inverted (scaled)
-    
+
     Returns:
         Full Neptune vector [mass, x, y, z, vx, vy, vz]
     """
     m_0 = set_true_m()
     neptune_full = m_0.copy()
     INVERT_INDICES = get_inversion_indices()
+    # Copy before modifying — caller's array must not be mutated.
+    inverted_params_scaled = np.atleast_1d(inverted_params_scaled).astype(np.float64).copy()
     inverted_params_scaled[0] = 10**inverted_params_scaled[0]  # Convert back to mass from log scale
-    inverted_params_scaled = np.atleast_1d(inverted_params_scaled)
     inverted_unscaled = unscale_param(inverted_params_scaled)
     inverted_unscaled = np.atleast_1d(inverted_unscaled)
-    
+
     for i, param_idx in enumerate(INVERT_INDICES):
         neptune_full[param_idx] = inverted_unscaled[i]
-    
+
     return neptune_full
 
 def predict_U(m, T: int = 190, dt: float = 1, z_scale_factor: int = 1) -> np.array:
@@ -65,24 +66,15 @@ def predict_U(m, T: int = 190, dt: float = 1, z_scale_factor: int = 1) -> np.arr
     velocities[0] = -total_momentum / masses[0]
     com = np.sum(masses[:, None] * positions, axis=0) / np.sum(masses)
     positions -= com
-    
-    uranus_positions = []
+
     uranus_idx = names.index('Uranus')
-    
-    t_days = 365 * T 
-    num_steps = int(t_days / dt) - 1
-    
-    uranus_positions.append(positions[uranus_idx].copy())
-    
-    for step in range(num_steps):
-        positions, velocities = rk4_step(positions, velocities, masses, dt)
-        uranus_positions.append(positions[uranus_idx].copy())
-    
-    uranus_positions = np.array(uranus_positions)
-    sampled = uranus_positions[::365]
+    num_steps = int(365 * T / dt) - 1
+    sample_every = int(365 / dt)
+
+    sampled = integrate_uranus(positions, velocities, masses, num_steps, uranus_idx, float(dt), sample_every)
     x_pred = sampled[:, 0]
     y_pred = sampled[:, 1]
     z_pred = sampled[:, 2] * z_scale_factor
-    
+
     return np.concatenate([x_pred, y_pred, z_pred])
 
