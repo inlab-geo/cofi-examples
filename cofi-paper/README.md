@@ -5,7 +5,7 @@ CoFI use case notebooks
 These are the notebooks illustrating the three use cases of CoFI:
 
 - **educator** — A tutorial progressing from polynomial fitting to change-point models using Bayesian inference. Demonstrates CoFI's unified interface for linear solvers, optimisation, and MCMC sampling, applied to sea level data.
-- **researcher** — Explores surface wave tomography with CoFI, comparing different regularisation options and ensemble methods.
+- **practitioner** — Explores surface wave tomography with CoFI, comparing different regularisation options and ensemble methods.
 - **developer** — Shows how developers can integrate new algorithms into CoFI, using receiver function analysis as an example.
 
 ## Rendered notebooks
@@ -17,7 +17,7 @@ Full builds also export Jupyter notebooks with outputs to `rendered/`:
 | Notebook | Description |
 |---|---|
 | [educator](rendered/educator.ipynb) | Polynomial fitting and change-point models |
-| [researcher](rendered/researcher.ipynb) | Surface wave tomography |
+| [practitioner](rendered/practitioner.ipynb) | Surface wave tomography |
 | [developer](rendered/developer.ipynb) | Extending CoFI with custom solvers |
 
 These are generated with `--include-outputs` (outputs embedded) and require `nbformat`. They are not produced by `--fast` builds.
