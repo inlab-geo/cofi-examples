@@ -52,7 +52,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Researcher Notebook: From optimisation to Bayesian sampling - Ambient noise Tomography with CoFI
+    # Practitioner Notebook: From optimisation to Bayesian sampling - Ambient noise Tomography with CoFI
 
     ## Introduction
 

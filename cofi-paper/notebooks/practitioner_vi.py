@@ -52,7 +52,7 @@ def _(mo):
     This notebook applies **Gaussian Variational Inference** (VI) to ambient noise
     surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver.
 
-    The deterministic inversions in the companion `researcher.py` notebook produce a
+    The deterministic inversions in the companion `practitioner.py` notebook produce a
     single "best" model but do not quantify **uncertainty**. Gaussian VI provides a
     scalable approximation to the posterior distribution by fitting a multivariate
     Gaussian, yielding both a posterior mean and a full covariance (uncertainty) estimate.
@@ -778,7 +778,7 @@ def _(mo):
     ## Results
 
     The Gaussian VI posterior mean provides a velocity map comparable to the deterministic
-    nonlinear inversions (see `researcher.py`), but now accompanied by pixel-wise
+    nonlinear inversions (see `practitioner.py`), but now accompanied by pixel-wise
     uncertainty estimates. The uncertainty map highlights regions where the data provides
     less constraint — typically at domain edges and where ray coverage is sparse.
 
@@ -787,7 +787,7 @@ def _(mo):
     The Gaussian approximation assumes a unimodal, symmetric posterior. It cannot capture
     multi-modality, skewness, or the variable-complexity parameterisation that a
     trans-dimensional approach provides. For fully nonparametric uncertainty estimates,
-    see the Bayesian sampling section in `researcher.py`.
+    see the Bayesian sampling section in `practitioner.py`.
     """)
     return
 
