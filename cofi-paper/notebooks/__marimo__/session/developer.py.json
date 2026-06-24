@@ -1,0 +1,426 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.18.1"
+  },
+  "cells": [
+    {
+      "id": "MJUe",
+      "code_hash": "cfadc989a2218ef148a356cfd1da5c64",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"developer-notebook-from-a-bespoke-interface-to-a-common-interface\">Developer notebook: From a bespoke interface to a common interface</h1>\n<h2 id=\"introduction\">Introduction</h2>\n<span class=\"paragraph\">This notebook demonstrates how a developer can extend CoFI with a new inference tool. CoFI's plugin architecture is designed so that adding a solver only requires implementing a single class that conforms to a well-defined interface. Once registered, the new solver becomes available to every CoFI user through the same three-class workflow (<code>BaseProblem</code>, <code>InversionOptions</code>, <code>Inversion</code>) used throughout the framework.</span>\n<h3 id=\"why-contribute-a-solver\">Why Contribute a Solver?</h3>\n<ul>\n<li><strong>Access to a rich library of examples.</strong> CoFI ships with a diverse collection of geoscience inverse problems. By contributing a solver, the method can immediately be tested against all of these examples without building test cases from scratch.</li>\n<li><strong>Wider reach with minimal friction.</strong> Once registered as a CoFI backend, a solver becomes available to any researcher who has already defined their inverse problem in CoFI. Users can switch to any method by changing a single option in <code>InversionOptions</code>, with no need to learn a tool's native API.</li>\n<li><strong>Standardised benchmarking and comparison.</strong> Because every solver operates on the same <code>BaseProblem</code> definition, users can rigorously compare  methods against existing solvers on identical problems. This lowers the barrier to reproducible comparison in publications and teaching materials.</li>\n</ul>\n<h3 id=\"what-this-notebook-builds\">What This Notebook Builds</h3>\n<span class=\"paragraph\">This notebook walks through the process of integrating the <strong>Slime Mould Algorithm</strong> (SMA; Li et al., 2020) into CoFI. SMA is a bio-inspired, gradient-free metaheuristic that simulates the foraging behaviour of slime mould (<em>Physarum polycephalum</em>). It is particularly effective on multimodal objective landscapes where gradient-based methods become trapped in local minima.</span>\n<span class=\"paragraph\">The implementation uses the <a href=\"https://github.com/thieu1995/mealpy\" rel=\"noopener\" target=\"_blank\">MEALPY</a> library, which provides a mature, well-tested implementation of SMA along with dozens of other metaheuristic optimizers.</span>\n<blockquote>\n<span class=\"paragraph\"><strong>Note:</strong> A production MEALPY-SMA solver already ships with CoFI (registered as <code>mealpy.sma</code>). This notebook re-implements it from scratch under the name <code>mealpy.sma.demo.from.this.notebook</code> purely to illustrate the contribution process step by step. The patterns shown here apply to any new solver.</span>\n</blockquote>\n<h3 id=\"notebook-overview\">Notebook Overview</h3>\n<ol>\n<li><strong>Motivation</strong> \u2014 A multimodal test problem where gradient-based optimisation fails</li>\n<li><strong>The <code>BaseInferenceTool</code> contract</strong> \u2014 What CoFI requires from a solver</li>\n<li><strong>Implementation</strong> \u2014 Building the SMA tool class step by step</li>\n<li><strong>Registration</strong> \u2014 Making the tool available through CoFI's API</li>\n<li><strong>Validation</strong> \u2014 Testing the tool on the motivating problem</li>\n<li><strong>Define once, solve many ways</strong> \u2014 Comparing SMA against existing solvers</li>\n<li><strong>Contribution checklist</strong> \u2014 What a pull request should contain</li>\n</ol></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "e2f3fdaf046a5d650120dff3c7d794e2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"1-motivation-when-gradient-based-methods-fail\">1. Motivation: When Gradient-Based Methods Fail</h2>\n<span class=\"paragraph\">The <strong>Himmelblau function</strong> is a classic test problem with four global minima of equal depth:</span>\n<marimo-tex class=\"arithmatex\">||[f(x_1, x_2) = (x_1^2 + x_2 - 11)^2 + (x_1 + x_2^2 - 7)^2||]</marimo-tex><span class=\"paragraph\">The four minima are located at approximately:</span>\n<table>\n<thead>\n<tr>\n<th><marimo-tex class=\"arithmatex\">||(x_1||)</marimo-tex></th>\n<th><marimo-tex class=\"arithmatex\">||(x_2||)</marimo-tex></th>\n<th><marimo-tex class=\"arithmatex\">||(f(x_1, x_2)||)</marimo-tex></th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>3.0</td>\n<td>2.0</td>\n<td>0.0</td>\n</tr>\n<tr>\n<td>\u22122.805</td>\n<td>3.131</td>\n<td>0.0</td>\n</tr>\n<tr>\n<td>\u22123.779</td>\n<td>\u22123.283</td>\n<td>0.0</td>\n</tr>\n<tr>\n<td>3.584</td>\n<td>\u22121.848</td>\n<td>0.0</td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">A gradient-based optimizer will converge to whichever minimum is nearest to the starting point. It cannot explore the landscape to discover all four. Let us see this in action.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "884ac415132419f56ef77252d8fd4150",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"gradient-based-optimisation-with-scipyoptimizeminimize\">Gradient-based optimisation with <code>scipy.optimize.minimize</code></h3>\n<span class=\"paragraph\">Let us attempt to find the global minima using CoFI's <code>scipy.optimize.minimize</code> backend from several starting points. Each run will converge to the nearest local (which happens to be global) minimum \u2014 but no single run explores the full landscape.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "51ede5fb35cf9d6fc275374f579adba0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Each white square is a starting point; each arrow shows convergence to the nearest minimum. To find all four minima, four separate runs with carefully chosen starting points were needed. A population-based metaheuristic like SMA can explore the full landscape in a single run.</span>\n<span class=\"paragraph\"><strong>This is the motivation</strong>: making SMA available in CoFI so that any user can access it through the standard API. Let us now see what CoFI requires from a new solver.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "abb6c19a6a249cf572d6274f3bd4a51d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"2-the-baseinferencetool-contract\">2. The <code>BaseInferenceTool</code> Contract</h2>\n<span class=\"paragraph\">Every solver in CoFI is a subclass of <code>BaseInferenceTool</code>. The contract is straightforward \u2014 implement six members:</span>\n<table>\n<thead>\n<tr>\n<th>Member</th>\n<th>Type</th>\n<th>Purpose</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>required_in_problem()</code></td>\n<td>classmethod \u2192 <code>set</code></td>\n<td>Problem components the solver <strong>must</strong> have (e.g. <code>{\"objective\", \"model_shape\"}</code>)</td>\n</tr>\n<tr>\n<td><code>optional_in_problem()</code></td>\n<td>classmethod \u2192 <code>dict</code></td>\n<td>Components the solver <strong>can</strong> use, with defaults (e.g. <code>{\"bounds\": None}</code>)</td>\n</tr>\n<tr>\n<td><code>required_in_options()</code></td>\n<td>classmethod \u2192 <code>set</code></td>\n<td>Solver parameters the user <strong>must</strong> provide</td>\n</tr>\n<tr>\n<td><code>optional_in_options()</code></td>\n<td>classmethod \u2192 <code>dict</code></td>\n<td>Solver parameters with sensible defaults (e.g. <code>{\"epoch\": 100}</code>)</td>\n</tr>\n<tr>\n<td><code>__init__(problem, options)</code></td>\n<td>method</td>\n<td>Validation and setup (call <code>super().__init__()</code> to get automatic checks)</td>\n</tr>\n<tr>\n<td><code>__call__()</code></td>\n<td>method</td>\n<td>Run the solver; return a dict with <code>\"model\"</code> and <code>\"success\"</code></td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">The base class handles validation automatically: if a required component is missing, CoFI raises a clear error before the solver ever runs. Optional components fall back to defaults.</span>\n<h3 id=\"key-design-principle\">Key design principle</h3>\n<span class=\"paragraph\">Solvers operate on <strong>flat parameter vectors</strong>. They know nothing about the physics of the problem \u2014 no coordinate systems, no spatial structure, no units. This separation is what makes CoFI's \"define once, solve many ways\" philosophy work: the problem definition contains the physics, the solver contains the algorithm.</span>\n<span class=\"paragraph\">Let us inspect an existing tool to see the pattern in practice.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "34fd7372372a82364f677560200c5a34",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The Newton solver needs <code>objective</code>, <code>gradient</code>, <code>hessian</code>, and <code>initial_model</code> from the problem, and <code>num_iterations</code> from the options. Everything else has defaults.</span>\n<span class=\"paragraph\">For SMA, the requirements will be simpler: it is gradient-free, so it only needs an <code>objective</code> and <code>model_shape</code> (to know the dimensionality). Bounds are helpful but optional.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "1d9ecedbdff4f50356449d5a0b701fb7",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"3-implementing-the-sma-tool\">3. Implementing the SMA Tool</h2>\n<span class=\"paragraph\">The tool class is built incrementally, explaining each piece. The Slime Mould Algorithm is a population-based optimizer inspired by the oscillatory behaviour of slime mould when foraging for food. Key parameters:</span>\n<ul>\n<li><strong><code>epoch</code></strong> \u2014 number of generations (iterations) to evolve the population</li>\n<li><strong><code>pop_size</code></strong> \u2014 number of candidate solutions in the population</li>\n<li><strong><code>pr</code></strong> \u2014 a probability parameter controlling exploration vs exploitation (default 0.03)</li>\n</ul>\n<span class=\"paragraph\">The implementation wraps MEALPY's library, translating between CoFI's conventions and MEALPY's API.</span>\n<h3 id=\"step-1-define-what-the-solver-needs\">Step 1: Define what the solver needs</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "7979ed1c50bfcda0fa10c39a617b2dd5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Let us walk through the key design decisions in this implementation:</span>\n<span class=\"paragraph\"><strong><code>required_in_problem = {\"objective\", \"model_shape\"}</code></strong> \u2014 SMA is gradient-free, so it only needs a scalar objective function and the dimensionality of the parameter space. Compare this with the Newton solver which requires <code>objective</code>, <code>gradient</code>, <code>hessian</code>, and <code>initial_model</code>.</span>\n<span class=\"paragraph\"><strong><code>optional_in_problem = {\"bounds\": None, \"initial_model\": None}</code></strong> \u2014 Bounds constrain the search space (critical for metaheuristics); an initial model can seed the population. Both have fallbacks.</span>\n<span class=\"paragraph\"><strong><code>_objective_function_wrapper</code></strong> \u2014 This bridge function lives at module level (not as a method) so it can be pickled for parallel execution. It reshapes MEALPY's flat candidate vector back to <code>model_shape</code> before calling the user's objective. It also handles the case where an objective returns a <code>(value, gradient)</code> tuple \u2014 common in CoFI since many objectives are shared across gradient-based and gradient-free solvers.</span>\n<span class=\"paragraph\"><strong><code>__call__</code> returns a dict</strong> \u2014 The contract requires <code>\"model\"</code> (the best solution, reshaped to <code>model_shape</code>) and <code>\"success\"</code> (bool). The implementation also includes <code>\"objective\"</code> (best fitness) and <code>\"n_iterations\"</code> for diagnostics.</span>\n<hr />\n<blockquote>\n<span class=\"paragraph\"><strong>How this relates to the production tool</strong></span>\n<span class=\"paragraph\">CoFI already ships a production MEALPY-SMA solver at <code>src/cofi/tools/_mealpy_sma.py</code> (registered as <code>mealpy.sma</code>). The class above is a simplified re-implementation used to illustrate the contribution process. The production version adds:\n- An <code>@error_handler</code> decorator for user-friendly error messages\n- Support for parallel execution modes (<code>\"thread\"</code>, <code>\"process\"</code>, <code>\"swarm\"</code>)\n- Logging control (<code>log_to</code>, <code>log_file</code> parameters)\n- Convergence history tracking\n- The <code>DevSMA</code> algorithm variant</span>\n</blockquote></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "cba73b70b1e44fde92769452d50060dc",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"4-registering-the-tool\">4. Registering the Tool</h2>\n<span class=\"paragraph\">With the class implemented, CoFI needs to be told about it. In a real contribution, this means editing <code>src/cofi/tools/__init__.py</code> to:</span>\n<ol>\n<li>Import the class</li>\n<li>Add it to <code>inference_tools_table</code> under the appropriate solving method</li>\n<li>Optionally add aliases</li>\n</ol>\n<span class=\"paragraph\">Here we do the equivalent at runtime, registering our re-implementation under the name <code>mealpy.sma.demo.from.this.notebook</code> so it coexists alongside the production <code>mealpy.sma</code> tool that already ships with CoFI.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "67a3bb791d5244f07eb308ac02840915",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><blockquote>\n<span class=\"paragraph\"><strong>What the actual registration would look like</strong></span>\n<span class=\"paragraph\">In <code>src/cofi/tools/__init__.py</code>:\n<div class=\"language-python codehilite\"><pre><span></span><code><span class=\"kn\">from</span><span class=\"w\"> </span><span class=\"nn\">._mealpy_sma</span><span class=\"w\"> </span><span class=\"kn\">import</span> <span class=\"n\">MealpySma</span>\n\n<span class=\"n\">inference_tools_table</span> <span class=\"o\">=</span> <span class=\"p\">{</span>\n    <span class=\"s2\">&quot;optimization&quot;</span><span class=\"p\">:</span> <span class=\"p\">{</span>\n        <span class=\"o\">...</span>\n        <span class=\"s2\">&quot;mealpy.sma&quot;</span><span class=\"p\">:</span> <span class=\"n\">MealpySma</span><span class=\"p\">,</span>\n        <span class=\"s2\">&quot;mealpy.slime_mould&quot;</span><span class=\"p\">:</span> <span class=\"n\">MealpySma</span><span class=\"p\">,</span>  <span class=\"c1\"># alias</span>\n    <span class=\"p\">},</span>\n    <span class=\"o\">...</span>\n<span class=\"p\">}</span>\n</code></pre></div>\nThe alias <code>\"mealpy.slime_mould\"</code> lets users refer to the tool by either name. The derived tables <code>tool_dispatch_table</code> and <code>tool_suggest_table</code> are built automatically from <code>inference_tools_table</code>.</span>\n</blockquote></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "e5e8550915e57a471be47df84222f9e4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"5-validating-the-implementation\">5. Validating the Implementation</h2>\n<span class=\"paragraph\">The tool is registered. Let us verify it works through CoFI's standard API on our Himmelblau problem. This is the moment of truth \u2014 if the tool class is correctly implemented, CoFI will dispatch to it transparently.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "a0e3db48babda56f059c6d81956a62dd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">SMA converges to one of the four global minima in a single run. Unlike the gradient-based approach, it did not need a carefully chosen starting point \u2014 the population explores the landscape broadly.</span>\n<h3 id=\"running-multiple-seeds\">Running multiple seeds</h3>\n<span class=\"paragraph\">Population-based methods are stochastic. Different random seeds lead to different minima being found. Let us run SMA several times to see how it explores the landscape.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nHfw",
+      "code_hash": "cb643e407bf3759ee4c68021cf8af356",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The white circles cluster tightly around the known minima. SMA successfully discovers all four global minima across different random seeds \u2014 no prior knowledge of the landscape was needed.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "xXTn",
+      "code_hash": "b2f8f8888741f92053cbb78ef678aefe",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"6-define-once-solve-many-ways\">6. Define Once, Solve Many Ways</h2>\n<span class=\"paragraph\">This is CoFI's central value proposition. The <strong>same problem definition</strong> can be solved with any compatible tool. Let us compare three optimisation backends on the Himmelblau problem:</span>\n<ul>\n<li><strong><code>scipy.optimize.minimize</code></strong> \u2014 gradient-based (L-BFGS-B)</li>\n<li><strong><code>cofi.border_collie_optimization</code></strong> \u2014 an existing metaheuristic in CoFI</li>\n<li><strong><code>mealpy.sma.demo.from.this.notebook</code></strong> \u2014 the tool we just built above</li>\n</ul>\n<span class=\"paragraph\">The problem definition does not change. Only <code>InversionOptions</code> differs.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "NCOB",
+      "code_hash": "5efe2d1529c74304e1d17bf58236500b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">From the same starting point <code>(0, 0)</code>:</span>\n<ul>\n<li><strong>scipy</strong> converges to the nearest minimum (gradient descent)</li>\n<li><strong>Border Collie</strong> and <strong>SMA</strong> both explore more broadly, potentially finding different minima</li>\n</ul>\n<span class=\"paragraph\">The key insight: not a single line of the problem definition changed between the three runs. The user only switched the tool name. This is what contributing a solver to CoFI enables \u2014 every problem that has already been defined in CoFI can immediately benefit from the new algorithm. Note that the SMA result here comes from the tool we built in this notebook, not from the production <code>mealpy.sma</code> backend (though they would behave identically).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aqbW",
+      "code_hash": "82156579e9c7f5f916fcebc903163b2e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"7-testing-your-contribution\">7. Testing Your Contribution</h2>\n<span class=\"paragraph\">A pull request should include tests that verify the tool works correctly across a range of scenarios. Below are the essential test cases, demonstrated inline.</span>\n<h3 id=\"test-1-basic-optimisation\">Test 1: Basic optimisation</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TXez",
+      "code_hash": "07c1fa9f60a1fb4476fac95b9b75a48f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"test-2-tuple-returning-objectives-gradient-compatibility\">Test 2: Tuple-returning objectives (gradient compatibility)</h3>\n<span class=\"paragraph\">Many CoFI objectives return <code>(value, gradient)</code> tuples. The tool must handle this gracefully by extracting only the scalar value.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "yCnT",
+      "code_hash": "bfe3d5345d2f64453b8985d745e9b9ba",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"test-3-per-parameter-bounds\">Test 3: Per-parameter bounds</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "kqZH",
+      "code_hash": "f1024d8e70c1f94d2fc4875c07e3ca34",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"test-4-higher-dimensional-problem-rosenbrock-10d\">Test 4: Higher-dimensional problem (Rosenbrock 10D)</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "rEll",
+      "code_hash": "2a60d8a040157c61bc81d41331c7d616",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"test-5-missing-required-component-raises-an-error\">Test 5: Missing required component raises an error</h3></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SdmI",
+      "code_hash": "f4dd5bbc1300581a3ce1da55f5803a0e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"8-contribution-checklist\">8. Contribution Checklist</h2>\n<span class=\"paragraph\">To contribute a new solver to CoFI, a pull request should include the following:</span>\n<h3 id=\"files-to-create\">Files to create</h3>\n<table>\n<thead>\n<tr>\n<th>File</th>\n<th>Contents</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>src/cofi/tools/_mealpy_sma.py</code></td>\n<td>Tool class (<code>MealpySma</code>) subclassing <code>BaseInferenceTool</code></td>\n</tr>\n<tr>\n<td><code>tests/cofi_tools/test_mealpy_sma.py</code></td>\n<td>Tests covering basic optimisation, bounds, tuple objectives, high-dimensional scaling, error handling</td>\n</tr>\n</tbody>\n</table>\n<h3 id=\"files-to-modify\">Files to modify</h3>\n<table>\n<thead>\n<tr>\n<th>File</th>\n<th>Change</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>src/cofi/tools/__init__.py</code></td>\n<td>Import the class; add to <code>inference_tools_table</code> with aliases</td>\n</tr>\n<tr>\n<td><code>pyproject.toml</code></td>\n<td>Add optional dependency (<code>mealpy &gt;= 3.0</code>)</td>\n</tr>\n</tbody>\n</table>\n<h3 id=\"optional-but-recommended\">Optional but recommended</h3>\n<table>\n<thead>\n<tr>\n<th>File</th>\n<th>Contents</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>examples/slime_mould_algorithm_optimization.ipynb</code></td>\n<td>Example notebook in the <code>cofi-examples</code> repository demonstrating the tool on benchmark problems</td>\n</tr>\n</tbody>\n</table>\n<h3 id=\"quality-checklist\">Quality checklist</h3>\n<ul class=\"task-list\">\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> <code>required_in_problem</code> / <code>optional_in_problem</code> are minimal and correct</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> <code>__call__</code> returns a dict with at least <code>\"model\"</code> and <code>\"success\"</code></li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Tuple-returning objectives are handled (scalar extraction)</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Multiple bounds formats work (uniform, per-parameter)</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Dependencies are lazy-imported (inside methods, not at module top level)</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Tests pass with <code>pytest</code></li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Code formatted with <code>black</code></li>\n<li class=\"task-list-item\"><input type=\"checkbox\" disabled/> Test coverage &gt; 80%</li>\n</ul>\n<h3 id=\"recommended-commit-strategy\">Recommended commit strategy</h3>\n<div class=\"language-actionscript3 codehilite\"><pre><span></span><code><span class=\"n\">feat</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"w\"> </span><span class=\"n\">MealpySma</span><span class=\"w\"> </span><span class=\"n\">inference</span><span class=\"w\"> </span><span class=\"n\">tool</span>\n<span class=\"n\">feat</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">register</span><span class=\"w\"> </span><span class=\"n\">mealpy</span><span class=\"o\">.</span><span class=\"na\">sma</span><span class=\"w\"> </span><span class=\"k\">in</span><span class=\"w\"> </span><span class=\"n\">inference_tools_table</span>\n<span class=\"n\">chore</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"w\"> </span><span class=\"n\">mealpy</span><span class=\"w\"> </span><span class=\"n\">optional</span><span class=\"w\"> </span><span class=\"n\">dependency</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">pyproject</span><span class=\"o\">.</span><span class=\"na\">toml</span>\n<span class=\"n\">test</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"w\"> </span><span class=\"n\">tests</span><span class=\"w\"> </span><span class=\"k\">for</span><span class=\"w\"> </span><span class=\"n\">MealpySma</span>\n<span class=\"n\">style</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">format</span><span class=\"w\"> </span><span class=\"k\">with</span><span class=\"w\"> </span><span class=\"n\">black</span>\n</code></pre></div></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lgWD",
+      "code_hash": "7452b8eab1e6adc45f491cbc55ee8c76",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"summary\">Summary</h2>\n<span class=\"paragraph\">This notebook demonstrated the full workflow for contributing a new solver to CoFI:</span>\n<ol>\n<li><strong>Motivation</strong> \u2014 Gradient-based methods fall short on multimodal landscapes, motivating a population-based alternative</li>\n<li><strong>The <code>BaseInferenceTool</code> contract</strong> \u2014 The six members every solver must implement</li>\n<li><strong>Implementation</strong> \u2014 An SMA tool class built step by step, with each design decision explained</li>\n<li><strong>Registration</strong> \u2014 The tool registered at runtime and verified in CoFI's tool registry</li>\n<li><strong>Validation</strong> \u2014 The implementation tested on the Himmelblau function, confirming it finds all four global minima</li>\n<li><strong>Define once, solve many ways</strong> \u2014 Three solvers compared on the same problem with identical problem definitions</li>\n<li><strong>Testing</strong> \u2014 Edge cases covered: tuple objectives, per-parameter bounds, high-dimensional problems, and error handling</li>\n<li><strong>Contribution checklist</strong> \u2014 What a pull request should contain</li>\n</ol></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hbol",
+      "code_hash": "dad883284267a405847dac230b143e17",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "f4b2cf8fe487abac73be2facfd965b15",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "3cacce17a06af702a256abbb8d1c5754",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "15f19cae38f0b483992572f36adcf386",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "7514248efb114cf72f59d59b60131b07",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "a8455c408fe0796f671daaa4ee5f6d25",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "b9f4de82b79a47a46e2ceb27969645e6",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "b4b4c3ae0c4d327f7487d6c1fe6dcbde",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "abb3992713d64db8c2896d4b02c7370f",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "6fca1821428d2f9f6ae975d95f95d07d",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "ce6c9469c64ff0bbd58f01a0d2b25b72",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "82a15ce5601ea54618072c8b859d511e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "00f89abc751c5f54ca8c51e5c5afd3f1",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "aLJB",
+      "code_hash": "3b87b369f91ce491a95c8926e2ef0a24",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "AjVT",
+      "code_hash": "4f420200ffcb088622308164d151a304",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "pHFh",
+      "code_hash": "f6577b16ab6c2234c7cd3f4e6a9f216e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TRpd",
+      "code_hash": "f73d61333f84e2c4cfeadfe0839d41c6",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "dNNg",
+      "code_hash": "6661bc3947dcd76596f558927b4b5023",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "wlCL",
+      "code_hash": "ebecc46629cb3ed8a93cfe7976092cf6",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "wAgl",
+      "code_hash": "1a140e6133d7122ae9adcb0f0e1bb679",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "dGlV",
+      "code_hash": "6349fcc1d872414ad3e574420bc3272f",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "yOPj",
+      "code_hash": "07fa820cd88106a85d9daf9ef78437c5",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}

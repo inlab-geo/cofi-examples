@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CoFI Beans rendered notebooks</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f6f2;
+        --ink: #1d2528;
+        --muted: #5d666b;
+        --panel: #ffffff;
+        --line: #d9ddd6;
+        --accent: #0f766e;
+        --accent-dark: #134e4a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(960px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 56px 0;
+      }
+
+      header {
+        margin-bottom: 32px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 680px;
+      }
+
+      .notebooks {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+      }
+
+      .notebook {
+        display: flex;
+        flex-direction: column;
+        min-height: 188px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .notebook:focus-visible,
+      .notebook:hover {
+        border-color: var(--accent);
+        outline: 3px solid rgba(15, 118, 110, 0.18);
+      }
+
+      .notebook h2 {
+        margin: 0 0 10px;
+        font-size: 1.25rem;
+      }
+
+      .notebook p {
+        font-size: 0.95rem;
+      }
+
+      .open {
+        margin-top: auto;
+        padding-top: 24px;
+        color: var(--accent-dark);
+        font-weight: 700;
+      }
+
+      footer {
+        margin-top: 28px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>CoFI Beans</h1>
+        <p>Rendered marimo notebooks with outputs. These pages are served directly so they are not limited by GitHub's source preview.</p>
+      </header>
+
+      <section class="notebooks" aria-label="Rendered notebooks">
+        <a class="notebook" href="educator.html">
+          <h2>Educator</h2>
+          <p>Polynomial fitting, change-point models, Bayesian inference, and sea level data.</p>
+          <span class="open">Open notebook</span>
+        </a>
+
+        <a class="notebook" href="researcher.html">
+          <h2>Researcher</h2>
+          <p>Surface wave tomography with regularisation choices and ensemble methods.</p>
+          <span class="open">Open notebook</span>
+        </a>
+
+        <a class="notebook" href="developer.html">
+          <h2>Developer</h2>
+          <p>Integrating new algorithms into CoFI using receiver function analysis.</p>
+          <span class="open">Open notebook</span>
+        </a>
+      </section>
+
+      <footer>
+        Rebuild locally with <code>./build.sh</code>, then commit the updated files in <code>rendered/</code>.
+      </footer>
+    </main>
+  </body>
+</html>

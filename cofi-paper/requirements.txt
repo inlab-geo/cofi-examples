@@ -1,0 +1,15 @@
+marimo
+nbformat
+numpy
+matplotlib
+scipy
+h5py
+arviz
+bayesbay
+cofi @ git+https://github.com/inlab-geo/cofi
+seislib
+cartopy
+cmcrameri
+mealpy
+# pyfm2d is not on PyPI — install from GitHub
+pyfm2d @ git+https://github.com/inlab-geo/pyfm2d

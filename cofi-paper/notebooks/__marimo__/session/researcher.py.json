@@ -1,0 +1,1392 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.19.7"
+  },
+  "cells": [
+    {
+      "id": "MJUe",
+      "code_hash": "233877474e79569427d79a44654904b1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"researcher-notebook-from-optimisation-to-bayesian-sampling-ambient-noise-tomography-with-cofi\">Researcher Notebook: From optimisation to Bayesian sampling - Ambient noise Tomography with CoFI</h1>\n<h2 id=\"introduction\">Introduction</h2>\n<span class=\"paragraph\">Surface wave tomography from Ambient noise cross correlations is a fundamental technique in seismology to image the  Earth's interior structure. This tutorial demonstrates how CoFI (Common Framework for Inference) enables researchers to efficiently solve large-scale surface wave tomography problems. It implements five separate ambient noise inversions on the same data with an increasingly level of sophistication, spanning linear, nonlinear, variational and Bayesian sampling algorithms.</span>\n<h2 id=\"why-cofi-for-research\">Why CoFI for Research?</h2>\n<ul>\n<li><strong>Inference requires experimentation</strong> \u2014 Development of inversion software typically requires making many choices. These may include  whether to take account of nonlinearity; what class of model parameterization to use; what type of regularization to employ; how to choose trade-off parameters; and how to assess uncertainty. CoFI facilitates this process by help the researcher experiment and compare outcomes.</li>\n<li><strong>Future-proofing</strong> \u2014 Method comparisons requested during peer review (e.g., \"compare LSQR against MINRES\") reduce to parameter\n  changes rather than reimplementation. As new solver backends are integrated into CoFI, existing problem definitions remain\n  compatible without modification.</li>\n<li><strong>Scale</strong> \u2014 With ~15,000 measurements and ~12,000 model parameters, this example reflects production-scale tomographic datasets. CoFI\n   interfaces directly with sparse linear algebra backends, eliminating the need to implement low-level matrix operations and, in this example, employs seislib to build the linear system for the linear case, and pyfm2d to perform seismic wavefront tracking for the nonlinear cases.</li>\n</ul>\n<h2 id=\"tutorial-overview\">Tutorial Overview</h2>\n<span class=\"paragraph\">The tutorial follows the process of a researcher inverting 5s period seismic surface wave ambient noise observations along great circle paths between station pairs.</span>\n<ul>\n<li>Initially raypaths are fixed and the inverse problem as treated as linear with design and regularization matrices calculated by the <code>seislib</code> package. Regularization weights are automatically calculated with an L-curve.</li>\n<li>Next the problem is recast as a nonlinear inversion with  raypaths calculated by the package <code>pyfm2d</code>. Several types of 2D regularization are explored together with alternate forms of nonlinear solver.</li>\n<li>The nonlinear result is then used to initialise <strong>Gaussian Variational Inference</strong>, which approximates the posterior with a multivariate Gaussian to provide fast uncertainty estimates via CoFI's <code>cofi.gaussian_vi</code> solver.</li>\n<li>Finally Trans-dimensional Bayesian sampling is performed where the spatial representation of the slowness model is represented by a variable number of 2D Voronoi cells.</li>\n</ul>\n<h3 id=\"key-takeaway\">Key Takeaway</h3>\n<span class=\"paragraph\">This tutorial showcases how CoFI may be used to experiment with sophisticated inference frameworks on a common real dataset. By maintaining a consistent API, CoFI lets researchers ask the question \u2014<em>which algorithm is the most suitable for my dataset and what assumptions and capabilities exist with different choices</em>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "358ec14eb8d4c0a3e68e02b8793b801e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"fast-or-slow-example\">Fast or slow example</h4></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "951490194025101e111eccd05086f350",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"the-tomographic-inverse-problem\">The Tomographic Inverse Problem</h3>\n<span class=\"paragraph\">Ambient noise surface wave tomography maps lateral slowness variations estimated from waveform cross-correlations between seismic stations. The forward problem relates observed inter-station travel times to the underlying slowness (reciprocal velocity).</span>\n<h4 id=\"linear-approximation-great-circle-paths\">Linear Approximation (Great Circle Paths)</h4>\n<span class=\"paragraph\">Under the assumption that rays travel along great circle paths\u2014that is, their paths are independent of the velocity model\u2014the forward problem reduces to a linear system:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{d} = \\mathbf{A}\\mathbf{m}||]</marimo-tex><span class=\"paragraph\">where:</span>\n<ul>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{d}||)</marimo-tex> is the data vector containing observed inter-station slowness measurements</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> is the kernel matrix encoding ray path sensitivities through discretised model cells</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex> is the model vector of slowness perturbations</li>\n</ul>\n<span class=\"paragraph\">This approximation is valid when lateral velocity heterogeneities are sufficiently weak that ray path perturbations contribute negligibly to travel time anomalies.</span>\n<h4 id=\"nonlinear-formulation-ray-bending-effects\">Nonlinear Formulation (Ray Bending Effects)</h4>\n<span class=\"paragraph\">In the presence of significant lateral heterogeneity, seismic rays deviate from great circle paths in accordance with Fermat's principle, following minimum-time trajectories through the velocity structure. Consequently, the ray geometry becomes a function of the model parameters, rendering the forward problem nonlinear:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{d} = \\mathbf{f}(\\mathbf{m})||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\mathbf{f}||)</marimo-tex> is a nonlinear functional that implicitly incorporates ray tracing through the current model estimate.</span>\n<span class=\"paragraph\">Solution of this nonlinear inverse problem proceeds via iterative linearisation. Expanding <marimo-tex class=\"arithmatex\">||(\\mathbf{f}(\\mathbf{m})||)</marimo-tex> about a reference model <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_k||)</marimo-tex> yields:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{f}(\\mathbf{m}) \\approx \\mathbf{f}(\\mathbf{m}_k) + \\mathbf{G}_k(\\mathbf{m} - \\mathbf{m}_k)||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\mathbf{G}_k = \\frac{\\partial \\mathbf{f}}{\\partial \\mathbf{m}}\\big|_{\\mathbf{m}_k}||)</marimo-tex> denotes the Fr\u00e9chet derivative matrix evaluated at iteration <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>. The resulting linearised system relates data residuals to model perturbations:</span>\n<marimo-tex class=\"arithmatex\">||[\\Delta\\mathbf{d}_k = \\mathbf{G}_k\\Delta\\mathbf{m}_k||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{d}_k = \\mathbf{d} - \\mathbf{f}(\\mathbf{m}_k)||)</marimo-tex> and <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{m}_k = \\mathbf{m}_{k+1} - \\mathbf{m}_k||)</marimo-tex>.</span>\n<span class=\"paragraph\">The iterative inversion procedure comprises the following steps:</span>\n<ol>\n<li>Initialise with a starting model <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_0||)</marimo-tex> (typically a laterally homogeneous reference)</li>\n<li>Compute synthetic data <marimo-tex class=\"arithmatex\">||(\\mathbf{f}(\\mathbf{m}_k)||)</marimo-tex> and the sensitivity matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{G}_k||)</marimo-tex> via ray tracing through the current model</li>\n<li>Solve the regularised linearised system for the model perturbation <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{m}_k||)</marimo-tex></li>\n<li>Update the model: <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_{k+1} = \\mathbf{m}_k + \\Delta\\mathbf{m}_k||)</marimo-tex></li>\n<li>Iterate until a suitable convergence criterion is satisfied (e.g., normalised residual reduction below a prescribed threshold)</li>\n</ol>\n<span class=\"paragraph\">The necessity of recomputing <marimo-tex class=\"arithmatex\">||(\\mathbf{G}_k||)</marimo-tex> at each iteration reflects the model-dependence of ray paths. This approach provides improved recovery of velocity structure in regions of strong lateral heterogeneity, where the great circle approximation introduces systematic bias.</span>\n<span class=\"paragraph\">In this tutorial the linear approximation is initially made and inversions performed. After which an iterative nonlinear approach is demonstrated on the same dataset.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "4b05a21152866cdcd19088bfaff737d3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"dataset\">Dataset</h3>\n<span class=\"paragraph\">Ambient noise tomography exploits cross-correlation of continuous seismic recordings between station pairs to extract empirical Green's functions, from which surface wave dispersion can be measured. Saygin &amp; Kennett (2010) integrated data from portable broadband deployments and permanent stations across Australia, extracting over 2000 Rayleigh wave group velocity measurements in the period range 5-12.5 s. These periods are primarily sensitive to crustal structure at depths of approximately 5-20 km.</span>\n<span class=\"paragraph\">The dataset employed in this study is from the multi-scale surface-wave tomography of continental Australia:</span>\n<blockquote>\n<span class=\"paragraph\">Magrini, F., Kastle, E., Pilia, S., Rawlinson, N., &amp; De Siena, L. (2023). A new shear-velocity model of continental Australia based on multi-scale surface-wave tomography. <em>Journal of Geophysical Research: Solid Earth</em>, 128(7), e2023JB026688. <a href=\"https://doi.org/10.1029/2023JB026688\" rel=\"noopener noreferrer\" target=\"_blank\">https://doi.org/10.1029/2023JB026688</a></span>\n</blockquote>\n<span class=\"paragraph\">Magrini et al. (2023) compiled an extensive dataset of surface-wave phase velocities derived from both seismic ambient noise and teleseismic earthquakes, producing Rayleigh and Love phase-velocity maps across continental Australia in the period range 4-200 s. The focus here is on inferring the Rayleigh-wave velocity across Australia at the surface-wave period of 5 s, consisting of 15,661 measurements.</span>\n<span class=\"paragraph\"><strong>Ray subsampling</strong>: The full dataset contains 15,661 ray paths. The <strong>run mode</strong> selector above controls how many rays are used (1% for fast iteration, 100% for full accuracy) along with MCMC sampling parameters. Individual parameters can still be overridden downstream.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "c4fc9eb4fe1f95dd3f0ed489ba6447e6",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"linear-inversion\">Linear Inversion</h2>\n<span class=\"paragraph\">The linear forward problem is constructed from scratch using seislib. This involves:</span>\n<ol>\n<li><strong>Define the model parameterisation</strong> \u2014 Create a grid of cells covering Australia</li>\n<li><strong>Import the observations into seislib</strong></li>\n<li><strong>Compute ray path sensitivities</strong> \u2014 For each station pair, calculate what fraction of the great circle path passes through each cell</li>\n<li><strong>Assemble the Jacobian matrix</strong> \u2014 Build the sparse matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> relating model parameters to observations</li>\n<li><strong>Form a regaulrisaiton matrix</strong> - From a roughness matrix using seislib</li>\n</ol></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "fc079c6f77e1ba5fcc36dfe860b48297",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"prepare-the-data-vector\">Prepare the Data Vector</h3>\n<span class=\"paragraph\">seislib stores the velocity measurements internally. The data vector is extracted here, converting to slowness for the linear system.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "417fa71882b1a4d90cba7daa0a0df6c0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"the-linear-system\">The Linear System</h3>\n<span class=\"paragraph\">All components of the linear forward problem are now in place:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{d} = \\mathbf{A}\\mathbf{m}||]</marimo-tex><span class=\"paragraph\">where:</span>\n<ul>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{d}||)</marimo-tex> is the <code>d_obs</code> vector (shape: n_obs)</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> is the <code>A</code> matrix (shape: n_obs \u00d7 n_params)</li>\n<li><marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex> is the unknown slowness model in each cell (shape: n_params)</li>\n</ul>\n<span class=\"paragraph\">The matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> encodes the physics: each row corresponds to one measurement, and the non-zero entries indicate which cells the ray passes through and for what distance.</span>\n<span class=\"paragraph\">All relevant quantities are summarized in the following table</span>\n<table>\n<thead>\n<tr>\n<th>Quantity</th>\n<th>Units</th>\n<th>Notes</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>tomo.velocity</code></td>\n<td>m/s</td>\n<td>Velocity stored by seislib</td>\n</tr>\n<tr>\n<td><code>d_obs</code></td>\n<td>s/m</td>\n<td>Observed slowness (1/velocity)</td>\n</tr>\n<tr>\n<td>Jacobian <code>A</code></td>\n<td>dimensionless</td>\n<td>Fractional path lengths (rows sum to 1)</td>\n</tr>\n<tr>\n<td>Model <code>m</code></td>\n<td>s/m</td>\n<td>Slowness in each grid cell</td>\n</tr>\n<tr>\n<td>Phase velocity</td>\n<td>km/s</td>\n<td>For display: <marimo-tex class=\"arithmatex\">||(v = 10^{-3}/m||)</marimo-tex></td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">The forward problem computes <strong>average slowness</strong> along each ray path:\n$<marimo-tex class=\"arithmatex\">||(d_i = \\sum_j A_{ij} \\cdot m_j||)</marimo-tex>$</span>\n<span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(A_{ij}||)</marimo-tex> is the fraction of ray <marimo-tex class=\"arithmatex\">||(i||)</marimo-tex> passing through cell <marimo-tex class=\"arithmatex\">||(j||)</marimo-tex> (so <marimo-tex class=\"arithmatex\">||(\\sum_j A_{ij} = 1||)</marimo-tex>), and <marimo-tex class=\"arithmatex\">||(m_j||)</marimo-tex> is the slowness in cell <marimo-tex class=\"arithmatex\">||(j||)</marimo-tex>.</span>\n<span class=\"paragraph\">For the linear example the model region spans 38.1<marimo-tex class=\"arithmatex\">||(^o||)</marimo-tex> in latitude and 45.3<marimo-tex class=\"arithmatex\">||(^o||)</marimo-tex> in longitude with a 0.3<marimo-tex class=\"arithmatex\">||(^o||)</marimo-tex> cell size, resulting in 19,328 cells to be contrained by 13,299 data.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "50ce441ec6ff1d19053acfef41820cd3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"regularized-least-squares\">Regularized Least-Squares</h3>\n<span class=\"paragraph\">Since the matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> is not invertible, the system of linear equations is ill-conditioned and it is not possible to find an exact solution for <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex>. This is overcome by inverting for the <strong>regularized least-squares solution</strong>:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{m} = \\left( \\mathbf{A}^\\top \\mathbf{A} + \\mu \\mathbf{R}^\\top \\mathbf{R} \\right)^{-1} \\mathbf{A}^\\top \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">where the target slowness model is assumed to be approximately known, i.e. <marimo-tex class=\"arithmatex\">||(\\mathbf{m} \\approx \\mathbf{m}_0||)</marimo-tex>. In the above expression:</span>\n<ul>\n<li>The <strong>roughness operator</strong> <marimo-tex class=\"arithmatex\">||(\\mathbf{R}||)</marimo-tex> depends on the discretization and here is given directly by the seislib package</li>\n<li>The <strong>damping coefficient</strong> <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex> can be chosen via L-curve analysis</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "04e6c14a66ebeb2bf749e42ac9f82bed",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"setting-up-cofi\">Setting up CoFI</h4>\n<span class=\"paragraph\">Inverse problems in CoFI are organised around three classes: <code>BaseProblem</code>, <code>InversionOptions</code>, and <code>Inversion</code>.</span>\n<ul>\n<li><strong><code>BaseProblem</code></strong> provides information about <em>what</em> the problem is to be solved. It defines the quantitities that inverse methods require\u2014data, forward operator, Jacobian, regularization, etc.</li>\n<li><strong><code>InversionOptions</code></strong> provides information about <em>how</em> to solve the inverse problem. It specifies the solving method and/or backend tool, along with any solver-specific parameters.</li>\n<li><strong><code>Inversion</code></strong> is the engine that combines these two classes to produce an <code>InversionResult</code> upon running.</li>\n</ul>\n<span class=\"paragraph\">A single <code>inv_problem</code> and <code>inv_options</code> pair is created once and reconfigured at each analysis stage \u2014 the same objects are reused for linear, nonlinear, and Bayesian formulations.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "21ce4ec4386a131610d73c81e267bc1b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"linearization\">Linearization</h4>\n<span class=\"paragraph\">Rather than solving directly for the slowness model <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex>, the inversion solves for a <strong>perturbation</strong> <marimo-tex class=\"arithmatex\">||(\\delta\\mathbf{m}||)</marimo-tex> around a reference model <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_0||)</marimo-tex>:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{m} = \\mathbf{m}_0 + \\delta\\mathbf{m}||]</marimo-tex><span class=\"paragraph\">This is more numerically stable because:</span>\n<ol>\n<li><strong>Better conditioning</strong> \u2014 The absolute slowness values are small (~0.0003 s/m). Solving for perturbations around a reference avoids potential precision issues.</li>\n<li><strong>Solver convergence</strong> \u2014 Iterative solvers like MINRES start from zero. When the true solution is a small perturbation, zero is a good initial guess.</li>\n<li><strong>Regularization interpretation</strong> \u2014 Penalising <marimo-tex class=\"arithmatex\">||(\\|\\mathbf{R}\\delta\\mathbf{m}\\|||)</marimo-tex> smooths deviations from the reference, which is often the desired behaviour.</li>\n</ol>\n<span class=\"paragraph\">The problem becomes: given residual <marimo-tex class=\"arithmatex\">||(\\mathbf{r} = \\mathbf{d} - \\mathbf{A}\\mathbf{m}_0||)</marimo-tex>, solve</span>\n<marimo-tex class=\"arithmatex\">||[\\min_{\\delta\\mathbf{m}} \\|\\mathbf{A}\\delta\\mathbf{m} - \\mathbf{r}\\|^2 + \\mu\\|\\mathbf{R}\\delta\\mathbf{m}\\|^2||]</marimo-tex></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "f64742c064203402dece9a8a6687ccf8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Here we build the CoFI classes and solve the quadratic optimization problem.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nHfw",
+      "code_hash": "629cf31643372fe1caaf92d7bcbc7f97",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Some plotting utilities to plot the result.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "NCOB",
+      "code_hash": "985d6c26e1919121bc100a6440008289",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">In this case we guessed a value of the roughness-damping  trade-off parameter <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex> which looks to be too large, as it has favours model smoothness over data fitting.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aqbW",
+      "code_hash": "1ff767ae133c4abda1a829f84b360f35",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"l-curve-analysis\">L-Curve Analysis</h3>\n<span class=\"paragraph\">An <strong>L-curve analysis</strong> can be used to select a more meaningful value of <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex>.</span>\n<span class=\"paragraph\">The L-curve plots the norm of the residual against the norm of the regularization term for different values of <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex>. The optimal value is typically at the \"corner\" of the L-curve.</span>\n<span class=\"paragraph\">The <code>LCurve</code> utility class wraps CoFI's <code>InversionPool</code> to run multiple inversions efficiently. Next we calculate and plot the L-curve ad estimate an optimal value.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "yCnT",
+      "code_hash": "45aacb4bbada9e39d81ad081bc60ec97",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"least-squares-solution-with-optimal-damping-coefficient\">Least-Squares Solution with Optimal Damping Coefficient</h3>\n<span class=\"paragraph\">The L-curve analysis automatically identifies the optimal damping coefficient at the corner using a <em>nearest to origin</em> selection strategy. This value is then used to compute the final phase-velocity map.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "wAgl",
+      "code_hash": "856eeb0a4139a8b6fe019886120297ad",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The above phase-velocity map aligns with that in Magrini et al. (2023), showing the expected velocity structure across Australia from 5s surface waves.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "rEll",
+      "code_hash": "fa689f930421d252919a598f2f569a3a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"iterative-nonlinear-inversion\">Iterative Nonlinear Inversion</h2>\n<span class=\"paragraph\">The linear inversion above assumes ray paths follow great circles, independent of the velocity model. This assumption breaks down when lateral velocity heterogeneities are strong enough to bend ray paths according to Fermat's principle.</span>\n<h3 id=\"why-nonlinear\">Why Nonlinear?</h3>\n<span class=\"paragraph\">In the linear approach, the sensitivity matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{A}||)</marimo-tex> is computed once using great circle paths. However, actual seismic waves follow minimum-time paths through the velocity structure. When velocity variations are significant:</span>\n<ol>\n<li><strong>Ray paths bend</strong> toward slow regions (higher slowness attracts rays)</li>\n<li><strong>The Jacobian changes</strong> as the velocity model updates</li>\n<li><strong>The forward problem becomes nonlinear</strong>: <marimo-tex class=\"arithmatex\">||(\\mathbf{d} = \\mathbf{f}(\\mathbf{m})||)</marimo-tex>.</li>\n</ol>\n<span class=\"paragraph\">A researcher may decide that ray bending is significant for this dataset and so there is need to experiment with a nonlinear inversion approach.</span>\n<span class=\"paragraph\">In what follows the observed slowness values per path used in the linear case and converted to travel times by multiplication by the path distance.</span>\n<h3 id=\"gauss-newton-iteration\">Gauss-Newton Iteration</h3>\n<span class=\"paragraph\">This nonlinear problem is solved iteratively. At each iteration <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex>:</span>\n<ol>\n<li><strong>Trace rays</strong> through the current model <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_k||)</marimo-tex> to compute predicted travel times <marimo-tex class=\"arithmatex\">||(\\mathbf{f}(\\mathbf{m}_k)||)</marimo-tex></li>\n<li><strong>Compute the Fr\u00e9chet derivative</strong> <marimo-tex class=\"arithmatex\">||(\\mathbf{G}_k = \\frac{\\partial \\mathbf{f}}{\\partial \\mathbf{m}}\\big|_{\\mathbf{m}_k}||)</marimo-tex></li>\n<li><strong>Solve the linearised subproblem</strong> <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{d}_k = \\mathbf{G}_k \\Delta\\mathbf{m}_k||)</marimo-tex> for the model perturbation <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{m}_k||)</marimo-tex>:\n   where <marimo-tex class=\"arithmatex\">||(\\Delta\\mathbf{d}_k = \\mathbf{d} - \\mathbf{f}(\\mathbf{m}_k)||)</marimo-tex></li>\n<li><strong>Update the model</strong>: <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_{k+1} = \\mathbf{m}_k + \\Delta\\mathbf{m}_k||)</marimo-tex></li>\n<li><strong>Repeat</strong> until convergence (residual stops decreasing significantly)</li>\n</ol>\n<span class=\"paragraph\">This is the same formulation described in the introduction, now implemented with actual ray tracing.</span>\n<span class=\"paragraph\">A summary of relevant terms follows:</span>\n<table>\n<thead>\n<tr>\n<th>Quantity</th>\n<th>Units</th>\n<th>Notes</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>d_obs</code></td>\n<td>s/m</td>\n<td>Observed slowness from seislib</td>\n</tr>\n<tr>\n<td><code>distances</code></td>\n<td>m</td>\n<td>Great circle inter-station distances</td>\n</tr>\n<tr>\n<td><code>d_obs_tt</code></td>\n<td>s</td>\n<td>Observed travel times: <marimo-tex class=\"arithmatex\">||(t = s \\cdot d||)</marimo-tex></td>\n</tr>\n<tr>\n<td>Model <code>m</code> (pyfm2d)</td>\n<td>s/km</td>\n<td>Slowness at each grid node</td>\n</tr>\n<tr>\n<td>Velocity (pyfm2d)</td>\n<td>km/s</td>\n<td>pyfm2d internally uses <marimo-tex class=\"arithmatex\">||(v = 1/m||)</marimo-tex></td>\n</tr>\n<tr>\n<td>Fr\u00e9chet matrix</td>\n<td>s/(s/km) = km</td>\n<td>Sensitivity of travel time to slowness</td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">The forward problem computes <strong>travel times</strong> by solving the eikonal equation:\n$<marimo-tex class=\"arithmatex\">||(t_i = \\int_{\\text{ray}_i} s(\\mathbf{x}) \\, dl||)</marimo-tex>$</span>\n<span class=\"paragraph\">where the ray path itself depends on the slowness model <marimo-tex class=\"arithmatex\">||(s(\\mathbf{x})||)</marimo-tex>, making this a nonlinear problem.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dGlV",
+      "code_hash": "2f5a5bc28e58d9539afb324a4feb687c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"pyfm2d-setup\">pyfm2d Setup</h3>\n<span class=\"paragraph\"><strong>pyfm2d</strong> (Python Fast Marching 2D) handles the nonlinear forward problem. pyfm2d implements the Fast Marching Method for 2D wavefront tracking, which:</span>\n<ul>\n<li>Computes travel times by solving the eikonal equation</li>\n<li>Provides Fr\u00e9chet derivatives (sensitivity to slowness) in the same call</li>\n<li>Supports spherical coordinates for surface wave tomography (lat/lon)</li>\n<li>Is efficient enough for iterative inversion with ~15,000 rays</li>\n</ul>\n<h4 id=\"from-slowness-in-rectangular-cells-to-slowness-at-nodes\">From slowness in rectangular cells to slowness at nodes</h4>\n<span class=\"paragraph\">Since the 2D wavefront tracker internally represents a velocity model in terms of nodes on a regular grid, rather than values within cells, it makes sense to use the same representation as model parameters in the inversion. As a consequence for the nonlinear inversion the number of model parameters becomes 19456, but the problem is similar under, or more likely mixed-determined and requires regularization.</span>\n<h4 id=\"parallelisation-strategy\">Parallelisation Strategy</h4>\n<span class=\"paragraph\">Ray tracing is parallelised over sources using <code>ProcessPoolExecutor</code>. Each source is traced independently in a separate process, and results are combined after all sources complete. Process-based parallelism is required because pyfm2d's underlying C/Fortran code is not thread-safe. This pattern:</span>\n<ul>\n<li>Provides explicit control over worker allocation</li>\n<li>Enables progress reporting via <code>tqdm</code> (showing completed sources)</li>\n<li>Isolates each worker in its own memory space (avoids thread-safety issues)</li>\n<li>Scales well to the number of available CPU cores</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "urSm",
+      "code_hash": "d1e3de17c2a1807a36254c3fe5c8bddb",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"regularisation-for-the-nonlinear-inversion\">Regularisation for the Nonlinear Inversion</h3>\n<span class=\"paragraph\">Two regularization operators are available, selectable via <code>use_gaussian_reg</code> in the cell below.</span>\n<span class=\"paragraph\"><strong>Option 1 \u2014 Second-order Laplacian</strong> (<code>use_gaussian_reg = False</code>)</span>\n<span class=\"paragraph\">A rectangular finite-difference operator that penalises curvature (second spatial\nderivatives) of the slowness field:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{R} = \\begin{bmatrix} \\mathbf{I} \\otimes \\mathbf{D}_2^{\\text{lat}} \\\\ \\mathbf{D}_2^{\\text{lon}} \\otimes \\mathbf{I} \\end{bmatrix}, \\quad \\mathbf{D}_2 = \\begin{bmatrix}1 &amp; -2 &amp; 1 \\\\ &amp; \\ddots \\end{bmatrix}||]</marimo-tex><span class=\"paragraph\">This is the same operator type as seislib's <code>roughness_operator</code>, adapted for the\npyfm2d node-based grid. It is scale-free: the single free parameter is <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex>,\nwhich controls the trade-off between data fit and model roughness.</span>\n<span class=\"paragraph\"><strong>Option 2 \u2014 SPDE Mat\u00e9rn \u03bd=1</strong> (<code>use_gaussian_reg = True</code>)</span>\n<span class=\"paragraph\">A sparse square precision-factor operator derived from the stochastic partial\ndifferential equation (SPDE) link to Gaussian random fields (Lindgren et al. 2011).\nFor Mat\u00e9rn smoothness \u03bd=1 in 2D, the precision matrix is <marimo-tex class=\"arithmatex\">||(\\mathbf{Q} = \\mathbf{R}^T\\mathbf{R}||)</marimo-tex> where:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{R} = \\tau \\mathbf{M}^{1/2}(\\kappa^2 \\mathbf{I} - \\mathbf{L}_h), \\quad \\kappa = \\sqrt{2}/\\ell, \\quad \\tau = \\frac{1}{2\\sqrt{\\pi}\\,\\kappa\\,\\sigma}||]</marimo-tex><span class=\"paragraph\">Here <marimo-tex class=\"arithmatex\">||(\\mathbf{L}_h||)</marimo-tex> is the grid-spacing-aware 2D discrete Laplacian and\n<marimo-tex class=\"arithmatex\">||(\\mathbf{M}||)</marimo-tex> is the lumped mass matrix. On a uniform grid, <marimo-tex class=\"arithmatex\">||(\\mathbf{M} \\approx h_x h_y \\mathbf{I}||)</marimo-tex>,\nso the implemented factor is <marimo-tex class=\"arithmatex\">||(\\mathbf{R} = \\tau \\sqrt{h_x h_y}(\\kappa^2 \\mathbf{I} - \\mathbf{L}_h)||)</marimo-tex>.\nRegularisation is applied to <marimo-tex class=\"arithmatex\">||(\\mathbf{m} - \\mathbf{m}_0||)</marimo-tex> so the penalty is zero\nfor the background model.</span>\n<h4 id=\"matern-1-correlation-function\">Mat\u00e9rn \u03bd=1 correlation function</h4>\n<span class=\"paragraph\">The standard Mat\u00e9rn kernel with length scale <marimo-tex class=\"arithmatex\">||(\\ell||)</marimo-tex> and smoothness <marimo-tex class=\"arithmatex\">||(\\nu = 1||)</marimo-tex> gives the\nspatial correlation between two nodes separated by distance <marimo-tex class=\"arithmatex\">||(r||)</marimo-tex> as:</span>\n<marimo-tex class=\"arithmatex\">||[C(r) = \\frac{\\sqrt{2}\\,r}{\\ell} \\, K_1\\!\\left(\\frac{\\sqrt{2}\\,r}{\\ell}\\right)||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(K_1||)</marimo-tex> is the modified Bessel function of the second kind of order 1. This function\nhas the properties:</span>\n<table>\n<thead>\n<tr>\n<th>Distance</th>\n<th>Correlation</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><marimo-tex class=\"arithmatex\">||(r = 0||)</marimo-tex></td>\n<td><marimo-tex class=\"arithmatex\">||(C = 1||)</marimo-tex></td>\n</tr>\n<tr>\n<td><marimo-tex class=\"arithmatex\">||(r = \\ell||)</marimo-tex></td>\n<td><marimo-tex class=\"arithmatex\">||(C \\approx 0.44||)</marimo-tex></td>\n</tr>\n<tr>\n<td><marimo-tex class=\"arithmatex\">||(r = 2\\ell||)</marimo-tex> (practical range <marimo-tex class=\"arithmatex\">||(\\rho||)</marimo-tex>)</td>\n<td><marimo-tex class=\"arithmatex\">||(C \\approx 0.14||)</marimo-tex></td>\n</tr>\n<tr>\n<td><marimo-tex class=\"arithmatex\">||(r = 3\\ell||)</marimo-tex></td>\n<td><marimo-tex class=\"arithmatex\">||(C \\approx 0.04||)</marimo-tex></td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">The practical range <marimo-tex class=\"arithmatex\">||(\\rho = 2\\ell||)</marimo-tex> is the distance at which correlation drops to ~0.14.\nLarger <marimo-tex class=\"arithmatex\">||(\\ell||)</marimo-tex> forces smoother models.</span>\n<span class=\"paragraph\"><marimo-tex class=\"arithmatex\">||(\\sigma||)</marimo-tex> is the <strong>marginal standard deviation</strong> of the slowness perturbation field \u2014\ni.e. the prior standard deviation at any single grid node. Setting <marimo-tex class=\"arithmatex\">||(\\sigma = 0.02||)</marimo-tex> s/km\nencodes a belief that slowness deviates from the background by at most ~<marimo-tex class=\"arithmatex\">||(2\\sigma \\approx \\pm 0.04||)</marimo-tex> s/km,\ncorresponding to roughly <marimo-tex class=\"arithmatex\">||(\\pm||)</marimo-tex>12% velocity variation about 3 km/s.\nThe plot below shows <marimo-tex class=\"arithmatex\">||(C(r)||)</marimo-tex> for the current value of <marimo-tex class=\"arithmatex\">||(\\ell||)</marimo-tex>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "CcZR",
+      "code_hash": "48c2b2571f6995dab13d8595bf744ce4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The SPDE branch uses <code>cofi.utils.SPDEMaternReg</code> to build the Mat\u00e9rn \u03bd=1 precision factor <strong>R = \u03c4(\u03ba\u00b2I \u2212 L_h)</strong> with <strong>Neumann (zero-flux) boundary conditions</strong>, where \u03ba = \u221a2/\u2113 and \u03c4 = 1/(2\u221a\u03c0 \u03ba \u03c3). The practical range is \u03c1 = 2\u2113. The grid-spacing-aware Laplacian L_h correctly accounts for the physical cell size. The Laplacian branch uses <code>cofi.utils.QuadraticReg</code> with a manually-built rectangular second-order operator, matching seislib's roughness operator type.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "tZnO",
+      "code_hash": "89093e3022da230ea2876a8125c8a7b2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"l-bfgs-b-algorithm\">L-BFGS-B algorithm</h4>\n<span class=\"paragraph\">Our first attempt at iterative nonlinear minimization uses the Limited-memory Broyden\u2013Fletcher\u2013Goldfarb\u2013Shanno (L-BFGS-B) algortihm. CoFI supports <code>scipy.optimize.minimize</code> for nonlinear problems, which works with a general scalar objective function:</span>\n<marimo-tex class=\"arithmatex\">||[\\phi(\\mathbf{m}) = \\frac{1}{2}\\|\\mathbf{d} - \\mathbf{f}(\\mathbf{m})\\|^2 + \\frac{\\mu}{2}\\|\\mathbf{R}(\\mathbf{m}-\\mathbf{m}_0)\\|^2||]</marimo-tex><span class=\"paragraph\">The gradient is computed as:</span>\n<marimo-tex class=\"arithmatex\">||[\\nabla\\phi = -\\mathbf{G}^\\top(\\mathbf{d} - \\mathbf{f}(\\mathbf{m})) + \\mu\\mathbf{R}^\\top\\mathbf{R}(\\mathbf{m}-\\mathbf{m}_0)||]</marimo-tex><span class=\"paragraph\">This approach is useful when you want to use optimisation algorithms like L-BFGS-B, which can be more efficient for problems with many parameters.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "YECM",
+      "code_hash": "d0579cbee832118777f21347c9308a99",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>Ray-streak artefacts:</strong> In practice, the L-BFGS-B result tends to show streaky structure aligned with ray paths, particularly with limited data. This occurs because the gradient <marimo-tex class=\"arithmatex\">||(\\nabla\\phi||)</marimo-tex> projects sensitivity back along rays, so model updates are concentrated where rays pass. In this case regularisation enters only as a scalar gradient term that L-BFGS-B's limited-memory Hessian approximation does not capture well \u2014 especially in limited numbers of iterations.</span>\n<span class=\"paragraph\">Next we attempt CoFI's <code>least_squares</code> solver applied to an augmented linear system of equations.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "cEAS",
+      "code_hash": "99092e4e1b562273fbdf121523856e3a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"improved-an-iterative-least-squares-solver-on-an-augmented-system\">Improved: An iterative least squares solver on an augmented system</h3>\n<h4 id=\"regularisation-via-augmented-system\">Regularisation via Augmented System</h4>\n<span class=\"paragraph\">Since <code>scipy.optimize.least_squares</code> minimises <marimo-tex class=\"arithmatex\">||(\\|\\mathbf{r}(\\mathbf{m})\\|^2||)</marimo-tex>, regularisation may be incorporated by augmenting the residual vector:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{r}_{\\text{aug}}(\\mathbf{m}) = \\begin{bmatrix} \\mathbf{d} - \\mathbf{f}(\\mathbf{m}) \\\\ \\sqrt{\\mu}\\mathbf{R}(\\mathbf{m} - \\mathbf{m}_0) \\end{bmatrix}||]</marimo-tex><span class=\"paragraph\">This ensures <marimo-tex class=\"arithmatex\">||(\\|\\mathbf{r}_{\\text{aug}}\\|^2 = \\|\\mathbf{d} - \\mathbf{f}(\\mathbf{m})\\|^2 + \\mu\\|\\mathbf{R}(\\mathbf{m}-\\mathbf{m}_0)\\|^2||)</marimo-tex>. Subtracting <marimo-tex class=\"arithmatex\">||(\\mathbf{m}_0||)</marimo-tex> means the penalty is on perturbations from the background model \u2014 essential for the SPDE operator (whose <marimo-tex class=\"arithmatex\">||(\\kappa^2\\mathbf{I}||)</marimo-tex> term is non-zero for a constant field) and harmless for the Laplacian (which annihilates any constant). The Jacobian is augmented correspondingly:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{G}_{\\text{aug}} = \\begin{bmatrix} \\mathbf{G} \\\\ \\sqrt{\\mu}\\mathbf{R} \\end{bmatrix}||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\mathbf{G} = \\frac{\\partial \\mathbf{f}}{\\partial \\mathbf{m}}||)</marimo-tex> is the Fr\u00e9chet derivative from ray tracing. The Jacobian <marimo-tex class=\"arithmatex\">||(\\mathbf{G}||)</marimo-tex> from pyfm2d is sparse \u2014 each ray passes through only a small fraction of grid cells \u2014 so the augmented system is kept in sparse format throughout to avoid densification.</span>\n<span class=\"paragraph\">Next we set up this augmented linear system re-using previously defined elements.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "EJmg",
+      "code_hash": "f6d289f383aeb1c5b5c4b84f9bea1e27",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"optional-nonlinear-l-curve\">Optional Nonlinear L-curve</h4>\n<span class=\"paragraph\">The next cell optionally calculates an optimal trade-off parameter <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex> via an L-curve calculation. This can be very expensive when many raypaths are calculated, so by default we skip it and use a previously calculated value of <marimo-tex class=\"arithmatex\">||(\\mu||)</marimo-tex>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dxZZ",
+      "code_hash": "d5d60d721200515915453600bd1362c1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The nonlinear result shows similar structure to the linear case but with more detail at the fine scale.</span>\n<span class=\"paragraph\">The linear and nonlinear results seem consistent, but we have had to impose a particular choice of model parameterisation and also type of regularization, and weighting. To complete the research project we may want to drop some of these assumptions and also look at estimating uncertainty in the resulting slowness model.</span>\n<span class=\"paragraph\">Before moving to fully nonparametric sampling, we first apply <strong>Gaussian Variational Inference</strong> \u2014 a fast, scalable approach that approximates the posterior with a Gaussian distribution, providing both a posterior mean and uncertainty estimates at a fraction of the cost of MCMC.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dlnW",
+      "code_hash": "6d73f26f5f7dfd999fe004fb8f1c4fee",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"gaussian-variational-inference\">Gaussian Variational Inference</h2>\n<span class=\"paragraph\"><strong>Variational inference</strong> (VI) reformulates Bayesian inference as an optimisation problem: find the distribution <marimo-tex class=\"arithmatex\">||(q(\\mathbf{m})||)</marimo-tex> within a tractable family that is closest (in KL divergence) to the true posterior <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m} | \\mathbf{d})||)</marimo-tex>. This is equivalent to maximising the <strong>Evidence Lower Bound</strong> (ELBO):</span>\n<marimo-tex class=\"arithmatex\">||[\\text{ELBO}(q) = \\mathbb{E}_{q}\\left[\\log p(\\mathbf{d} | \\mathbf{m})\\right] - \\text{KL}\\left[q(\\mathbf{m}) \\| p(\\mathbf{m})\\right]||]</marimo-tex><span class=\"paragraph\">CoFI's <code>cofi.gaussian_vi</code> solver approximates the posterior with a multivariate Gaussian <marimo-tex class=\"arithmatex\">||(q(\\mathbf{m}) = \\mathcal{N}(\\boldsymbol{\\mu}, \\boldsymbol{\\Omega}^{-1})||)</marimo-tex> using <strong>natural-gradient</strong> updates on the precision-parameterised mean and covariance. The algorithm proceeds in three phases:</span>\n<ol>\n<li><strong>MAP estimation</strong> \u2014 Gauss-Newton iteration with Armijo line search to find the posterior mode</li>\n<li><strong>Gaussian VI</strong> \u2014 Natural-gradient updates on <marimo-tex class=\"arithmatex\">||((\\boldsymbol{\\mu}, \\boldsymbol{\\Omega})||)</marimo-tex>, warm-started from the MAP estimate</li>\n<li><strong>Optional flow</strong> \u2014 Sinh-arcsinh normalising flow for non-Gaussian features (not used here)</li>\n</ol>\n<span class=\"paragraph\">The prior precision matrix <marimo-tex class=\"arithmatex\">||(\\mathbf{Q}_p = \\mathbf{R}^\\top\\mathbf{R}||)</marimo-tex> is constructed from the SPDE or Laplacian operator \u2014 the same <code>R_pyfm2d</code> used in the nonlinear inversion. Because the solver works entirely in precision space, all matrices remain <strong>sparse</strong> and the computation scales to large grids.</span>\n<span class=\"paragraph\">Unlike the trans-dimensional approach below, Gaussian VI assumes a fixed parameterisation and unimodal posterior, but it runs orders of magnitude faster and still provides useful uncertainty estimates.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "fCoF",
+      "code_hash": "3521004ebec3254b72e7d4eb14a6ae6a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The Gaussian VI posterior mean is similar to the nonlinear least-squares result, which is expected \u2014 both solve essentially the same inverse problem. The key addition is the <strong>uncertainty map</strong>, which shows where the posterior is tightly constrained by data (low std dev, typically along dense ray paths) and where the model is poorly resolved (high std dev, at the edges and in ray-sparse regions).</span>\n<span class=\"paragraph\">The Gaussian assumption limits this approximation to unimodal, symmetric posteriors. For problems where the posterior may be multimodal or strongly skewed \u2014 or where the model parameterisation itself is uncertain \u2014 we turn to trans-dimensional sampling.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "LkGn",
+      "code_hash": "eb68c9e479e02f266ace0f454b152578",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"trans-dimensional-bayesian-inversion\">Trans-dimensional Bayesian Inversion</h2>\n<span class=\"paragraph\">The Gaussian VI approximation above provides fast uncertainty estimates, but assumes a unimodal Gaussian posterior on a fixed grid. Where the true posterior is multimodal, skewed, or where the appropriate model complexity is unknown, a more flexible approach is needed.</span>\n<span class=\"paragraph\"><strong>Trans-dimensional Bayesian inversion</strong> addresses these questions by sampling the posterior probability distribution over models using reversible-jump Markov chain Monte Carlo (RJ-MCMC). Key features:</span>\n<ul>\n<li><strong>Variable complexity</strong> \u2014 The number of Voronoi cells is itself a parameter, so the data determines the appropriate level of detail</li>\n<li><strong>No explicit regularisation</strong> \u2014 Parsimony is enforced by the trans-dimensional prior (Occam's razor is built in)</li>\n<li><strong>Uncertainty quantification</strong> \u2014 The ensemble of posterior samples provides mean, standard deviation, and full probability distributions</li>\n<li><strong>Noise estimation</strong> \u2014 Data noise standard deviation is treated as an unknown and estimated jointly</li>\n</ul>\n<span class=\"paragraph\">The CoFI pattern remains the same: define a <code>BaseProblem</code>, set <code>InversionOptions</code> to use <code>\"bayesbay\"</code>, and call <code>Inversion.run()</code>. The existing Jacobian <code>A</code> and data vector <code>d_obs</code> are reused directly.</span>\n<h3 id=\"bayesian-formulation\">Bayesian Formulation</h3>\n<span class=\"paragraph\">In the Bayesian framework, the solution to the inverse problem is the <strong>posterior probability distribution</strong> over models, given by Bayes' theorem:</span>\n<marimo-tex class=\"arithmatex\">||[p(\\mathbf{m} | \\mathbf{d}) \\propto p(\\mathbf{d} | \\mathbf{m}) \\, p(\\mathbf{m})||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(p(\\mathbf{d} | \\mathbf{m})||)</marimo-tex> is the likelihood function and <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m})||)</marimo-tex> is the prior. Rather than seeking a single optimal model, this distribution is sampled to characterise the full range of models consistent with the data.</span>\n<span class=\"paragraph\">For Gaussian data noise with standard deviation <marimo-tex class=\"arithmatex\">||(\\sigma||)</marimo-tex>, the log-likelihood is:</span>\n<marimo-tex class=\"arithmatex\">||[\\log p(\\mathbf{d} | \\mathbf{m}) = -\\frac{1}{2\\sigma^2} \\|\\mathbf{d} - \\mathbf{A}\\mathbf{s}(\\mathbf{m})\\|^2 + \\text{const}||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\mathbf{s}(\\mathbf{m}) = 1/\\mathbf{v}||)</marimo-tex> is the slowness vector derived from the velocity model. The noise level <marimo-tex class=\"arithmatex\">||(\\sigma||)</marimo-tex> is itself treated as an unknown parameter with a uniform prior, estimated jointly with the model (hierarchical Bayes).</span>\n<h3 id=\"trans-dimensional-inference-and-voronoi-tessellations\">Trans-dimensional Inference and Voronoi Tessellations</h3>\n<span class=\"paragraph\">In fixed-dimensional inversion, the number of model parameters is prescribed. <strong>Trans-dimensional</strong> inversion allows the dimensionality itself \u2014 here, the number of Voronoi cells \u2014 to vary as a free parameter. The model space becomes a union over subspaces of different dimension:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathcal{M} = \\bigcup_{k=k_{\\min}}^{k_{\\max}} \\mathcal{M}_k||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\mathcal{M}_k||)</marimo-tex> denotes the space of models with <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> Voronoi cells. Each model consists of:</span>\n<ul>\n<li><marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> nuclei positions <marimo-tex class=\"arithmatex\">||(\\{(\\text{lon}_i, \\text{lat}_i)\\}_{i=1}^{k}||)</marimo-tex> within the Australian domain</li>\n<li><marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> velocity values <marimo-tex class=\"arithmatex\">||(\\{v_i\\}_{i=1}^{k}||)</marimo-tex>, one per cell</li>\n</ul>\n<span class=\"paragraph\">The Voronoi tessellation partitions the domain such that each point is assigned to the nearest nucleus. This naturally produces an adaptive parameterisation \u2014 regions requiring more detail receive more cells.</span>\n<h3 id=\"reversible-jump-mcmc\">Reversible-Jump MCMC</h3>\n<span class=\"paragraph\">Sampling across dimensions of varying size requires <strong>reversible-jump MCMC</strong> (Green, 1995). The Markov chain explores the posterior through four types of moves:</span>\n<ol>\n<li><strong>Birth</strong>: Add a new Voronoi cell (increase <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> by 1)</li>\n<li><strong>Death</strong>: Remove an existing cell (decrease <marimo-tex class=\"arithmatex\">||(k||)</marimo-tex> by 1)</li>\n<li><strong>Value perturbation</strong>: Change the velocity of an existing cell</li>\n<li><strong>Position perturbation</strong>: Move a nucleus to a new location</li>\n</ol>\n<span class=\"paragraph\">Birth and death proposals require careful acceptance probabilities that account for the change in dimensionality (the Jacobian of the dimension-matching transformation). The trans-dimensional prior naturally penalises unnecessary complexity \u2014 models with more cells than justified by the data will be rejected, implementing a form of automatic Occam's razor.</span>\n<blockquote>\n<span class=\"paragraph\">Green, P. J. (1995). Reversible jump Markov chain Monte Carlo computation and Bayesian model determination. <em>Biometrika</em>, 82(4), 711\u2013732.</span>\n</blockquote></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "woaO",
+      "code_hash": "e9f42350e010861bf157cafbb26a093b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"australia-polygon\">Australia Polygon</h3>\n<span class=\"paragraph\">BayesBay's <code>Voronoi2D</code> discretisation requires a polygon defining the domain boundary. The Australian mainland coastline is extracted from Natural Earth shapefiles via cartopy.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "wadT",
+      "code_hash": "3d987c45d2a553da52568e227daff952",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"grid-points-for-interpolation\">Grid Points for Interpolation</h3>\n<span class=\"paragraph\">The midpoint of each seislib grid cell is computed as <code>(lon, lat)</code>. During sampling, BayesBay's KD-tree maps Voronoi cell values onto these grid points via nearest-neighbour interpolation, enabling reuse of the existing Jacobian <code>A</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PSUk",
+      "code_hash": "718715eae0325301b206542f68dbd208",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"parameterisation\">Parameterisation</h3>\n<span class=\"paragraph\">The model is parameterised as a <strong>Voronoi tessellation</strong> over the Australian domain:</span>\n<ul>\n<li>Each Voronoi cell carries a phase velocity value drawn from a uniform prior <marimo-tex class=\"arithmatex\">||(v \\in [2, 4]||)</marimo-tex> km/s</li>\n<li>The number of cells varies between 100 and 1500, controlled by the trans-dimensional prior</li>\n<li>A KD-tree is computed at each step for fast nearest-neighbour interpolation onto the fixed grid</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vGiW",
+      "code_hash": "0cf73447ab26e1da44156bdd866ad55d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"forward-function-and-likelihood\">Forward Function and Likelihood</h3>\n<span class=\"paragraph\">The forward function reuses the existing Jacobian <code>A</code> and observed data <code>d_obs</code>:</span>\n<ol>\n<li>Extract Voronoi cell velocities and the KD-tree from the current state</li>\n<li>Interpolate velocities onto the fixed grid via nearest-neighbour lookup</li>\n<li>Convert to slowness and compute predicted data: <marimo-tex class=\"arithmatex\">||(\\mathbf{d}_{\\text{pred}} = \\mathbf{A} \\cdot (1/\\mathbf{v})||)</marimo-tex></li>\n</ol>\n<span class=\"paragraph\">Since <code>A</code> contains fractional path lengths (rows sum to 1) and <code>d_obs</code> is in s/m, the data is converted to s/km so that the velocity prior in km/s gives consistent units: <marimo-tex class=\"arithmatex\">||(1/v||)</marimo-tex> [km/s] <marimo-tex class=\"arithmatex\">||(=||)</marimo-tex> slowness [s/km].</span>\n<span class=\"paragraph\">The data noise standard deviation is treated as unknown, sampled jointly with the model from a uniform prior.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bMrW",
+      "code_hash": "fc0a481c2531fe231426477dc855ed58",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"mcmc-configuration\">MCMC Configuration</h3>\n<span class=\"paragraph\">Configure the RJ-MCMC sampling parameters. For production runs, use more chains and iterations; for quick tests, reduce these values.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "OfTS",
+      "code_hash": "659c1175ac7d1fac21672b6141ae083b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"run-the-inversion\">Run the Inversion</h3>\n<span class=\"paragraph\">The same <code>inv_problem</code> and <code>inv_options</code> are reconfigured once more \u2014 the <code>BaseProblem</code> \u2192 <code>InversionOptions</code> \u2192 <code>Inversion</code> pattern carries over from the deterministic sections. The forward function already reuses <code>A</code> and <code>d_obs</code> from earlier cells.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Plbk",
+      "code_hash": "9e9a2ee34e044c18584ee63cd8632882",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"results\">Results</h3>\n<span class=\"paragraph\">Extract posterior statistics from the saved MCMC samples: mean velocity, standard deviation (uncertainty), and estimated data noise.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "HuZB",
+      "code_hash": "0f5a274ed5bc23d562432bc7e6f665fe",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The next cell projects each Voronoi slowness model from all chains of the MCMC onto a predefined `fine' grid so that a mean and standard deviation may be calculated. This can become a computationally intensive task and parallelization is used to make the calculation more efficient.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Ynfw",
+      "code_hash": "ac4a5d5bbf804b7fdbc41b44b7e09734",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"mean-velocity-map\">Mean Velocity Map</h3>\n<span class=\"paragraph\">The posterior mean phase velocity, obtained by averaging over all retained MCMC samples. This is directly comparable to the deterministic results above.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "uDnK",
+      "code_hash": "abc8472200de22afa6a4f1ab45e457cd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">This mean model is comparable to that estimated by linear inversion above achieved with model estimation (although with no explicit regularization imposed). Here one can obsevere the influence of the underlying seislib grid used in the forward model.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aWBL",
+      "code_hash": "728a746cc2b4a28206f0c8ec8599c708",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"uncertainty-map\">Uncertainty Map</h3>\n<span class=\"paragraph\">The posterior standard deviation quantifies model uncertainty at each grid cell. Higher values indicate regions where the data provides less constraint \u2014 typically at domain edges or where ray coverage is sparse.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IrqS",
+      "code_hash": "9477cde40b69adb4af04a17fa4a72c8b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"posterior-voronoi-samples\">Posterior Voronoi Samples</h3>\n<span class=\"paragraph\">Six random draws from the posterior illustrate the diversity of models consistent with the data. Each sample has a different number and arrangement of Voronoi cells, reflecting the trans-dimensional nature of the inversion.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "upgv",
+      "code_hash": "72d570b7d416111b884c74ee5004553a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"summary\">Summary</h2>\n<span class=\"paragraph\">This notebook demonstrated CoFI's capabilities for surface wave tomography:</span>\n<span class=\"paragraph\"><strong>Linear inversion</strong> (Great Circle Approximation):</span>\n<ul>\n<li>L-curve analysis for regularisation parameter selection</li>\n<li>Sparse matrix solvers (MINRES) for large-scale problems</li>\n<li>~15,000 measurements and ~13,000 parameters</li>\n</ul>\n<span class=\"paragraph\"><strong>Nonlinear inversion</strong> (Ray Tracing with pyfm2d):</span>\n<ul>\n<li>Manual Gauss-Newton iteration with explicit control</li>\n<li>\n<span class=\"paragraph\">CoFI's built-in nonlinear solvers:</span>\n<ul>\n<li><code>scipy.optimize.minimize</code> (L-BFGS-B)</li>\n<li><code>scipy.optimize.least_squares</code> (trust-region-reflective)</li>\n</ul>\n</li>\n<li>All approaches reuse the same <code>inv_problem</code> and <code>inv_options</code> objects</li>\n</ul>\n<span class=\"paragraph\"><strong>Gaussian Variational Inference</strong> (CoFI Gaussian VI):</span>\n<ul>\n<li>Natural-gradient VI with precision-parameterised Gaussian approximation</li>\n<li>Fast posterior mean and uncertainty estimates without MCMC sampling</li>\n<li>Sparse prior precision from SPDE/Laplacian operator \u2014 same <code>R</code> matrix reused</li>\n<li>Warm-started from the nonlinear MAP estimate</li>\n</ul>\n<span class=\"paragraph\"><strong>Trans-dimensional Bayesian inversion</strong> (BayesBay):</span>\n<ul>\n<li>Reversible-jump MCMC with variable Voronoi tessellation complexity</li>\n<li>Uncertainty quantification via posterior mean and standard deviation maps</li>\n<li>Joint estimation of data noise</li>\n<li>Same <code>A</code> matrix and <code>d_obs</code> \u2014 only the solver changes</li>\n</ul>\n<h3 id=\"key-takeaways\">Key takeaways</h3>\n<ul>\n<li><strong>Unified interface</strong>: A single <code>inv_problem</code> and <code>inv_options</code> pair is reconfigured at each stage \u2014 linear, nonlinear, variational, and Bayesian formulations all use the same <code>BaseProblem</code> \u2192 <code>InversionOptions</code> \u2192 <code>Inversion</code> workflow</li>\n<li><strong>Backend flexibility</strong>: Switch solvers (MINRES, LSQR, trust-region, Gaussian VI, BayesBay) with parameter changes</li>\n<li><strong>Uncertainty quantification</strong>: Gaussian VI provides fast approximate uncertainty; trans-dimensional inversion provides principled uncertainty estimates without explicit regularisation</li>\n<li><strong>Extensibility</strong>: Custom utilities like <code>LCurve</code> can wrap CoFI's building blocks</li>\n<li><strong>Research workflow</strong>: Code developed for experimentation allows more considered choices to be made.</li>\n</ul>\n<h3 id=\"extensions\">Extensions</h3>\n<span class=\"paragraph\">Possible extensions not covered here:</span>\n<ul>\n<li><strong>Cross-validation</strong> for regularisation parameter selection</li>\n<li><strong>3D tomography</strong> using the same CoFI patterns with volumetric forward operators</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hbol",
+      "code_hash": "87d6b7125bac57a45ff51a9e7e00dc67",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "ab9319452e91945119abff700ee5a20b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Run mode: fast\n  ray_percentage: 1\n  vi_num_iterations: 30\n  vi_num_samples: 4\n  vi_map_iterations: 20\n  bb_n_chains: 2\n  bb_n_iterations: 1,000\n  bb_burnin: 0\n  bb_save_every: 10\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "Xref",
+      "code_hash": "4b9087ebbd26764140bed8a4042c8cea",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Ray subset: 1% selected (156 of 15,661 rays, seed=42)\n  Removed 2 duplicate pairs (averaged observations)\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "8156c52aeb742d8021ab328d83eaa3bd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "64df4bd1c5b988d33e0a9656dc506a6a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "-------------------------------------\nGRID PARAMETERS\nLonmin - Lonmax : 110.900 - 156.200\nLatmin - Latmax : -46.200 - -7.800\nNumber of cells : 19328\nGrid cells of 0.300\u00b0 : 19328\n-------------------------------------\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "ce3d52cd01a4075bac6aab7f85a5f86d",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'n_obs' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "c4a6463099bc387fe99b4df6a22d46b0",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "'SeismicTomography' object has no attribute 'velocity'",
+          "traceback": []
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "SeismicTomography object created:\n  Grid resolution: 0.3\u00b0\n  Grid bounds: lat [-46.2, -8.1], lon [110.9, 156.2]\n",
+          "mimetype": "text/plain"
+        },
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/tmp/marimo_129006/__marimo__cell_emfo_.py&quot;</span>, line <span class=\"m\">4</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"nb\">print</span><span class=\"p\">(</span><span class=\"sa\">f</span><span class=\"s2\">&quot;  Number of measurements: </span><span class=\"si\">{</span><span class=\"nb\">len</span><span class=\"p\">(</span><span class=\"n\">tomo</span><span class=\"o\">.</span><span class=\"n\">velocity</span><span class=\"p\">)</span><span class=\"si\">:</span><span class=\"s2\">,</span><span class=\"si\">}</span><span class=\"s2\">&quot;</span><span class=\"p\">)</span>\n<span class=\"w\">                                           </span><span class=\"pm\">^^^^^^^^^^^^^</span>\n<span class=\"gr\">AttributeError</span>: <span class=\"n\">&#39;SeismicTomography&#39; object has no attribute &#39;velocity&#39;</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "f73a349dde941aa883ec4046cc87483e",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "'SeismicTomography' object has no attribute 'data_coords'",
+          "traceback": []
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/tmp/marimo_129006/__marimo__cell_Hstk_.py&quot;</span>, line <span class=\"m\">3</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">tomo</span><span class=\"o\">.</span><span class=\"n\">compile_coefficients</span><span class=\"p\">(</span><span class=\"n\">keep_empty_cells</span><span class=\"o\">=</span><span class=\"kc\">True</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"pm\">~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^</span>\n  File <span class=\"nb\">&quot;/home/jrh/.virtualenvs/inlab/lib64/python3.14/site-packages/seislib/tomography/_tomography.py&quot;</span>, line <span class=\"m\">656</span>, in <span class=\"n\">compile_coefficients</span>\n<span class=\"w\">    </span><span class=\"n\">data_coords</span> <span class=\"o\">=</span> <span class=\"n\">np</span><span class=\"o\">.</span><span class=\"n\">radians</span><span class=\"p\">(</span><span class=\"bp\">self</span><span class=\"o\">.</span><span class=\"n\">data_coords</span><span class=\"p\">)</span>\n<span class=\"w\">                             </span><span class=\"pm\">^^^^^^^^^^^^^^^^</span>\n<span class=\"gr\">AttributeError</span>: <span class=\"n\">&#39;SeismicTomography&#39; object has no attribute &#39;data_coords&#39;</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "23c446df562cf7c3320253db3e02789e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Roughness operator R computed by seislib:\n  Shape: 19,328 \u00d7 19,328\n  Non-zero elements: 96,082\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "iLit",
+      "code_hash": "8088191aeede9956ce403f85ffcf0148",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "41257716fa34dcb8075538d50df0eeaa",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "'SeismicTomography' object has no attribute 'velocity'",
+          "traceback": []
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">&quot;/tmp/marimo_129006/__marimo__cell_ROlb_.py&quot;</span>, line <span class=\"m\">6</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">vel_data</span> <span class=\"o\">=</span> <span class=\"n\">tomo</span><span class=\"o\">.</span><span class=\"n\">velocity</span>  <span class=\"c1\"># Observed velocities (m/s)</span>\n<span class=\"w\">               </span><span class=\"pm\">^^^^^^^^^^^^^</span>\n<span class=\"gr\">AttributeError</span>: <span class=\"n\">&#39;SeismicTomography&#39; object has no attribute &#39;velocity&#39;</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "d8ac7ffc858f7fa3eafeeb8f8648c3e7",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "dd0665e4cd10ebb80636a796ca48bd3f",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "a03414212e60d2bbb262ecd7f27182ee",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aLJB",
+      "code_hash": "6eb71bd2b65ca579243b0f2015a0730b",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "xXTn",
+      "code_hash": "112c6e774f63313887cac9cfc8bdc98b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "AjVT",
+      "code_hash": "f36f9817081d059a27e41df595c83ffb",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "pHFh",
+      "code_hash": "3878843a1c4b5b43a5bbcb08b77ea409",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TRpd",
+      "code_hash": "4ef5ed9275bd9af3b9d738f987fd2a00",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TXez",
+      "code_hash": "6290209570f49c0fc3d036f593855e5e",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dNNg",
+      "code_hash": "ab59a03f2d4f63dd81547bb48f1fa0b2",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "wlCL",
+      "code_hash": "bfded03110653f68fe083d54b680710f",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "kqZH",
+      "code_hash": "842f2820c93ec96947e273dd7e6b065d",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SdmI",
+      "code_hash": "d0f631821dcdb9a63d135575e48b54ba",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lgWD",
+      "code_hash": "f91a978fa1d220c90cfe944df5b4e6d9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "pyfm2d configuration:\n  Grid shape: (152, 128) (128 lat x 152 lon = 19,456 cells)\n  Sources: 130, Receivers: 126, Pairs: 154\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "yOPj",
+      "code_hash": "30b5a15315267211413456c250491f8d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "fwwy",
+      "code_hash": "be4bd79442c764b28d51fb78eb42e2ba",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "LJZf",
+      "code_hash": "4ac3cfc10aa8e1dc7d0b7adfd081e3be",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "jxvo",
+      "code_hash": "ade442210b69d4cc6d7f9525f004c212",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "mWxS",
+      "code_hash": "3386bc20511b1d6cad09d05f0efd4baf",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "YWSi",
+      "code_hash": "1a4ff6cd86215e21bd43e5e749f05cff",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "zlud",
+      "code_hash": "b163249ba65154019874bb3a38ba5f72",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Nonlinear regularization (SPDE Mat\u00e9rn \u03bd=1 via cofi.utils (\u2113=2.12\u00b0 \u2248 235 km, \u03c1=2\u2113\u22484.24\u00b0, \u03c3=0.028209479177387815 s/km)):\n  Grid: 152 lon \u00d7 128 lat = 19,456 cells\n  R shape: (19456, 19456) (weighting matrix W, used as W @ m in penalty)\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "xvXZ",
+      "code_hash": "d4c6a7746fc80214057cae52745ecdc1",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "CLip",
+      "code_hash": "827cb65e5246967f60d27b4b886bc1dd",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iXej",
+      "code_hash": "62ef2cbae6d9ab2bc938e1d96b37f3bd",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "UmEG",
+      "code_hash": "28ce24ea17bbc8e57dad88fd20a17ba9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>Nonlinear regularisation parameter:</strong> <marimo-ui-element object-id='UmEG-0' random-id='b5cd99f9-c91a-0b7a-a409-482672542844'><marimo-switch data-initial-value='false' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Run nonlinear L-curve (fast mode only \u2014 expensive)&lt;/span&gt;&lt;/span&gt;&quot;' data-disabled='false'></marimo-switch></marimo-ui-element></span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vEBW",
+      "code_hash": "b6980059a15a8e390107dfdc56e0fddf",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "kLmu",
+      "code_hash": "3b352b7df0ff90243b3cfafa4ba04585",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IpqN",
+      "code_hash": "31f87c07d8de1f9535c373f3ac7c061b",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TTti",
+      "code_hash": "b4475ccac54d4d6178819a5d22faafcb",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "multiple-defs",
+          "evalue": "The variable 'n_obs' was defined by another cell",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RKFZ",
+      "code_hash": "9922ec4dd1dbcca324960e8c72b022d6",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IaQp",
+      "code_hash": "0eae2343b6ab6e8aa5801ce21c1bd60d",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IWgg",
+      "code_hash": "97208da64c31a62f7c6e9bc1d2ba9e4f",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "zVRe",
+      "code_hash": "b6a16a242f5534f178bffaf5eb6e35ed",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "HnMC",
+      "code_hash": "2ea78eb89de91f8a49a0ae53615ad295",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Australia polygon: Polygon\n  Bounds: (113.33895307826242, -43.6345972633621, 153.56946902894418, -10.668185723516686)\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "VCRE",
+      "code_hash": "7e5b9568675fc034fb8386af422f3559",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Grid points: 19328 cells\n  Lon range: [111.05, 156.05]\n  Lat range: [-46.05, -7.95]\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "hgqU",
+      "code_hash": "557f16200a9004c78a5302164c377e20",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Fine display grid: 481,572 points at 0.06\u00b0\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "mfOT",
+      "code_hash": "d9b4c23f9830d2e7c5724efe595c20c0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Parameterisation: Voronoi2D, 100\u20131500 cells\n  Velocity prior: Uniform[2, 4] km/s\n  Trans-dimensional: True\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "SYQT",
+      "code_hash": "3a577eeeefc7ecbb919bf1f18f8b4e9d",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PSQn",
+      "code_hash": "69ae120214027b3e75cd8c25b7ef372f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"sampling-parameters\">Sampling parameters</h4></span><marimo-ui-element object-id='PSQn-0' random-id='2ba458e9-e004-95a8-e059-33e513695553'><marimo-slider data-initial-value='2' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Number of chains&lt;/span&gt;&lt;/span&gt;&quot;' data-start='1' data-stop='24' data-step='1' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='true' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element><marimo-ui-element object-id='PSQn-1' random-id='7a1248f7-2caf-7308-7691-98a6b015ad76'><marimo-slider data-initial-value='1000' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Total iterations&lt;/span&gt;&lt;/span&gt;&quot;' data-start='1000' data-stop='500000' data-step='1000' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='true' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element><marimo-ui-element object-id='PSQn-2' random-id='5354855e-694a-8ee0-3884-587c57fcf849'><marimo-slider data-initial-value='0' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Burn-in iterations&lt;/span&gt;&lt;/span&gt;&quot;' data-start='0' data-stop='300000' data-step='1000' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='true' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element><marimo-ui-element object-id='PSQn-3' random-id='225a23a1-3307-5e4d-9108-9ffed9773f48'><marimo-slider data-initial-value='10' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Save every N&lt;/span&gt;&lt;/span&gt;&quot;' data-start='10' data-stop='500' data-step='10' data-steps='[]' data-debounce='false' data-disabled='false' data-orientation='&quot;horizontal&quot;' data-show-value='true' data-include-input='false' data-full-width='false'></marimo-slider></marimo-ui-element></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lQxp",
+      "code_hash": "44e34bd6413c148bc75e533ec932e9be",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "rSYo",
+      "code_hash": "e534388126de2558cc789d48b5aaa545",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "WfYj",
+      "code_hash": "b645297a8c7bf3d2ed06f0cf55d71acb",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "LqFA",
+      "code_hash": "dc5b4c19b81861595a9708312bf6ec74",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MIsd",
+      "code_hash": "f54d8e0a8536de7493aa8105ab6683c7",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Lpqv",
+      "code_hash": "d4a16677e0530ef8ccfd68b9e3683503",
+      "outputs": [
+        {
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (AttributeError): ",
+          "traceback": []
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "WJUG",
+      "code_hash": "786cb9bb9467826b9f1dec0f4e22ac47",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "pCao",
+      "code_hash": "fc61d9353b151efee09238d702a3e605",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>Environment</strong> \u2014 2026-04-01 19:47</span></span><marimo-ui-element object-id='pCao-0' random-id='151b3c6e-867d-6880-0639-8e7053958983'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;Package&#92;&quot;:&#92;&quot;Python&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;3.14.3&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;h5py&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;3.15.1&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;numpy&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;2.4.2&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;scipy&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;1.17.0&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;matplotlib&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;3.10.8&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;cmcrameri&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;1.9&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;cartopy&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;0.25.0&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;seislib&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;1.1.4&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;cofi&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;0.2.11+54.g32b2be3&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;marimo&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;0.19.7&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;pyfm2d&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;0.1.6&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;bayesbay&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;0.3.10&#92;&quot;},{&#92;&quot;Package&#92;&quot;:&#92;&quot;shapely&#92;&quot;,&#92;&quot;Version&#92;&quot;:&#92;&quot;2.1.2&#92;&quot;}]&quot;' data-total-rows='13' data-total-columns='2' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='false' data-page-size='13' data-show-filters='false' data-show-download='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element></div>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}

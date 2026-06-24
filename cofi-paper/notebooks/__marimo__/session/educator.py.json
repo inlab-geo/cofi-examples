@@ -1,0 +1,858 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.21.1",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "765884c94dec9f67416d794c94158396",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "1a2ffcdf866e20da9cb24b163fb037cd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"educator-notebook-from-polynomials-to-change-point-models-curve-fitting-with-cofi\">Educator notebook: From Polynomials to Change-Point Models - Curve Fitting with CoFI</h1>\n<h2 id=\"introduction\">Introduction</h2>\n<span class=\"paragraph\">This tutorial demonstrates how CoFI (Common Framework for Inference) empowers educators and learners to rapidly explore inference concepts that would otherwise require substantial implementation effort. Rather than spending time writing boilerplate code for each new method, users can focus on the science: understanding when models succeed, when they fail, and how to improve them.</span>\n<h3 id=\"why-cofi-for-education\">Why CoFI for Education?</h3>\n<span class=\"paragraph\">Implementing curve fitting from scratch\u2014handling optimisation, uncertainty quantification, and model comparison\u2014demands significant technical overhead. Extending to more sophisticated approaches like change-point detection multiplies this complexity. CoFI removes these barriers by providing:</span>\n<ul>\n<li><strong>A unified interface</strong> across inference methods, so learners invest time in understanding concepts rather than debugging implementations</li>\n<li><strong>Rapid experimentation</strong>, allowing students to test hypotheses about model suitability within minutes</li>\n<li><strong>Seamless method switching</strong>, making it straightforward to progress from simple to complex models as understanding deepens</li>\n</ul>\n<span class=\"paragraph\">This design philosophy is particularly valuable in educational settings, where the goal is conceptual clarity rather than focusing on low-level implementation details.</span>\n<h3 id=\"tutorial-overview\">Tutorial Overview</h3>\n<span class=\"paragraph\">The tutorial follows a progression of increasing sophistication in approach to allow the student to build their understanding gradually:</span>\n<ol>\n<li><strong>Polynomial Fitting Fundamentals</strong> \u2014 CoFI's problem-definition interface is introduced through polynomial regression, establishing the core workflow: define a <code>BaseProblem</code>, select <code>InversionOptions</code>, and run an <code>Inversion</code>.</li>\n<li><strong>Application to Sea Level Data</strong> \u2014 The polynomial model is applied to historical sea level observations, grounding abstract concepts in a real dataset of relevance.</li>\n<li><strong>Model Evaluation and Limitations</strong> \u2014 Examining the polynomial fit reveals systematic residuals. A single polynomial cannot adequately capture this behaviour. This is a teaching moment: recognising model inadequacy from residual patterns.</li>\n<li><strong>Transitioning to a Change-Point Model</strong> \u2014 Motivated by the data, a change-point regression model permits different rates of change before and after a transition point/time. With CoFI, this conceptually significant model change requires only minimal code modifications\u2014no new library, no rewritten optimisation loop.</li>\n</ol>\n<h3 id=\"key-takeaway\">Key Takeaway</h3>\n<span class=\"paragraph\">This tutorial showcases how CoFI lowers the barrier to exploring sophisticated inference techniques. By maintaining a consistent API, CoFI lets learners ask the question that matters\u2014<em>which model best describes my data?</em>\u2014and answer it immediately through experimentation, rather than getting lost in implementation complexity.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "15a2cfcdb648616335c7142f8a87eb0f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"polynomial-curves\">Polynomial curves</h2>\n<h3 id=\"introduction\">Introduction</h3>\n<span class=\"paragraph\">The regression model consists of polynomial curves,</span>\n<marimo-tex class=\"arithmatex\">||[y(x) = \\sum_{j=0}^M m_j x^j\\,||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(m_j, (j=0,\\dots M)||)</marimo-tex> are the 'model coefficients' to be constrained by the data. Here, <marimo-tex class=\"arithmatex\">||(M||)</marimo-tex> is the order of the polynomial: For <marimo-tex class=\"arithmatex\">||(M=0||)</marimo-tex> the model is a single constant (fixed y) level and hence 1 unknown parameter, <marimo-tex class=\"arithmatex\">||(m_o||)</marimo-tex>. With  <marimo-tex class=\"arithmatex\">||(M=1||)</marimo-tex> there is a straight line with 2 parameters, if <marimo-tex class=\"arithmatex\">||(M=2||)</marimo-tex> it is a quadratic with 3 parameters, and so on.</span>\n<span class=\"paragraph\">For the case of <marimo-tex class=\"arithmatex\">||(N||)</marimo-tex> data and order <marimo-tex class=\"arithmatex\">||(M=3||)</marimo-tex> polynomial the data/model relationship takes the  form:</span>\n<marimo-tex class=\"arithmatex\">||[\\left(\\begin{array}{c}y_0\\\\y_1\\\\\\vdots\\\\y_N\\end{array}\\right) = \\left(\\begin{array}{ccc}1&amp;x_0&amp;x_0^2&amp;x_0^3\\\\1&amp;x_1&amp;x_1^2&amp;x_1^3\\\\\\vdots&amp;\\vdots&amp;\\vdots\\\\1&amp;x_N&amp;x_N^2&amp;x_N^3\\end{array}\\right)\\left(\\begin{array}{c}m_0\\\\m_1\\\\m_2\\\\m_3\\end{array}\\right)||]</marimo-tex><span class=\"paragraph\">This clearly has the required general form, <marimo-tex class=\"arithmatex\">||(\\mathbf{d} =G{\\mathbf m}||)</marimo-tex>.</span>\n<span class=\"paragraph\">where:</span>\n<ul>\n<li><marimo-tex class=\"arithmatex\">||(\\textbf{d}||)</marimo-tex> is the vector of data values, (<marimo-tex class=\"arithmatex\">||(y_0,y_1,\\dots,y_N||)</marimo-tex>);</li>\n<li><marimo-tex class=\"arithmatex\">||(\\textbf{m}||)</marimo-tex> is the vector of model parameters, (<marimo-tex class=\"arithmatex\">||(m_0,m_1,m_2, m_3||)</marimo-tex>);</li>\n<li><marimo-tex class=\"arithmatex\">||(G||)</marimo-tex> is the  basis  (or design) matrix of this linear regression problem (sometimes called the <strong><em>Jacobian</em></strong> matrix).</li>\n</ul>\n<span class=\"paragraph\">The following Python functions compute <marimo-tex class=\"arithmatex\">||(G||)</marimo-tex> and the model prediction.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "4b14dae5b75baafe1b42dd39be46752e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "9305f5d5cc6ebca75270ad2c2bcc2340",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "13836893bbce4d363122f0c5d3dc8e62",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Using these functions, a set of noisy observations <marimo-tex class=\"arithmatex\">||(y_i (i=0,\\dots,N)||)</marimo-tex> can be generated for known locations <marimo-tex class=\"arithmatex\">||(x_i (i=0,\\dots,N)||)</marimo-tex> using a known function: <marimo-tex class=\"arithmatex\">||(y=-6-5x+2x^2+x^3||)</marimo-tex>, with Gaussian random noise <marimo-tex class=\"arithmatex\">||({\\cal N}(0,\\sigma^2)||)</marimo-tex> added, where <marimo-tex class=\"arithmatex\">||(\\sigma=1.0||)</marimo-tex>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "48f40a2e671d2fff85be499059d25798",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "ef1868674cfae76c71e6475c145ac7e2",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"fitting-a-polynomial-linear-approach\">Fitting a polynomial - Linear approach</h3>\n<span class=\"paragraph\">For a polynomial, the forward model is linear in the coefficients, <marimo-tex class=\"arithmatex\">||(m_j, (j=0,\\dots M)||)</marimo-tex> thus the model parameter can be estimated by solving a least squares problem. In the example here <marimo-tex class=\"arithmatex\">||(N&gt;M||)</marimo-tex> and the data are linearly independent and so the system becomes over-determined</span>\n<span class=\"paragraph\">For <marimo-tex class=\"arithmatex\">||(\\mathbf{d} = \\mathbf{G}\\mathbf{m}||)</marimo-tex>, the least squares solution is:</span>\n<marimo-tex class=\"arithmatex\">||[\\hat{\\mathbf{m}} = (\\mathbf{G}^T \\mathbf{G})^{-1} \\mathbf{G}^T \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">Typically though data are noisy and thus they should be weighted by the data covariance matrix.</span>\n<marimo-tex class=\"arithmatex\">||[\\hat{\\mathbf{m}} = (\\mathbf{G}^T \\mathbf{C}_d^{-1} \\mathbf{G})^{-1} \\mathbf{G}^T \\mathbf{C}_d^{-1} \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">For independent identically distribution Gaussian noise, the inverse data covariance matrix is defined as <marimo-tex class=\"arithmatex\">||(\\mathbf{C}_d^{-1} = \\frac{1}{\\sigma^2} \\mathbf{I}||)</marimo-tex>, where <marimo-tex class=\"arithmatex\">||(\\sigma = 1.0||)</marimo-tex> matches the standard deviation of the Gaussian noise added to the synthetic data. The reader will verify that for this special case the two solutions above are identical.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "c0cbae0272ff36927791f0a8bfb85ef3",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "99f10c16a32a22824448cca714f8f51b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Inverse problems in CoFI are organised around three classes  <code>BaseProblem</code>, <code>InversionOptions</code>, and <code>Inversion</code>.</span>\n<ul>\n<li><code>BaseProblem</code> provides information about what is to be solved. It defines the functions that inverse methods provided by CoFI require to solve the inverse problem. Parameter estimation methods, for example, almost always require an objective function.</li>\n<li><code>InversionOptions</code> provides information about how to solve the inverse problem. It defines the solving method and/or backend tool, along with any solver-specific parameters.</li>\n<li><code>Inversion</code> can be seen as an inversion engine that takes in the above two as information, and will produce an <code>InversionResult</code> upon running.</li>\n</ul>\n<span class=\"paragraph\">These are imported from CoFI below.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "15f19cae38f0b483992572f36adcf386",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "bbb880195c7942f440a3f668dba20b53",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">When the forward problem was introduced to generate synthetic data, the functions needed to set up the <code>BaseProblem</code> for polynomial fitting were defined.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "ccff3af89f5430dcb5dfacd2e048a203",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "b75cb9f4c1b7291dd1b3387525719804",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">CoFI groups solving methods for inverse problems into <code>matrix solvers</code>, <code>optimization</code> and <code>sampling</code> methods. The polynomial fitting has been formulated as a linear problem, so the <code>matrix solvers</code> group is appropriate. Once the group has been chosen, CoFI can provide a list of backends tools to solve the problem.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "9bef148783b6087fd11eadee21d0f9d3",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "0bf7619afdd9d9bd3aee81019217cb33",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">While the user may now choose on a particular solving method, this can be skipped as CoFI provides good defaults that work for most problems. For matrix solvers, the default backend tool is <code>scipy.linalg.lstsq</code>. The <code>InversionOptions</code> object provides a summary of how the inverse problem will be solved.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "3f686e935099733ac19d8f6e153eab5c",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "62639499e852a0f011695e93f782018d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">With <code>BaseProblem</code> and <code>InversionOptions</code> defined, an inversion can be run by combing them in the <code>Inversion</code> object.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "3ef54a80d7e9a4937602f00608f85a46",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "3737e77e8d07eb3d1806e3259b3b2ecf",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Different inversion algorithms return different types of information about the inversion result and CoFI gathers this information.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "ab64b2b1d8f0fb52bc29cb654b3c4a24",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "54ec1fd4bc226936c93770bee49e9e46",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "42cb346a85d30a83fe432452d5fa28fa",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"fitting-a-polynomial-iterative-optimiser-approach\">Fitting a polynomial - Iterative optimiser approach</h3>\n<span class=\"paragraph\">The over-determined linear problem, <marimo-tex class=\"arithmatex\">||(\\mathbf{d} = G\\mathbf{m}||)</marimo-tex>, with Gaussian data noise can also be solved by minimising the squares of the residuals of the linear equations, <marimo-tex class=\"arithmatex\">||(\\Delta \\mathbf{d}^T \\mathbf{C}_d^{-1} \\Delta \\mathbf{d}||)</marimo-tex> where <marimo-tex class=\"arithmatex\">||(\\Delta \\mathbf{d} = \\mathbf{d} - G \\mathbf{m}||)</marimo-tex>. This involves solving for an update of the model parameter <marimo-tex class=\"arithmatex\">||(\\Delta \\mathbf{m}||)</marimo-tex> such that:</span>\n<marimo-tex class=\"arithmatex\">||[\\mathbf{m}_{k+1} = \\mathbf{m}_k + \\Delta \\mathbf{m}||]</marimo-tex><span class=\"paragraph\">The gradient of the misfit function with respect to the model parameters is:</span>\n<marimo-tex class=\"arithmatex\">||[\\nabla_\\mathbf{m} \\phi = -G^T \\mathbf{C}_d^{-1} \\Delta \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">Setting this to zero and solving yields the iterative update. For a steepest descent approach:</span>\n<marimo-tex class=\"arithmatex\">||[\\Delta \\mathbf{m} = \\alpha G^T \\mathbf{C}_d^{-1} \\Delta \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(\\alpha||)</marimo-tex> is a step length parameter which must be chosen at each iteration. This type of iterative approach is particularly useful when the number of unknowns is large and direct matrix inversion approach used earlier is impractical. It also extends naturally to non-linear problems where the Jacobian matrix, <marimo-tex class=\"arithmatex\">||(G||)</marimo-tex>, is a function of the model parameters <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex> and must be re-evaluated iteratively as the current model estimate is updated.</span>\n<span class=\"paragraph\">Alternatively, if matrix inversion is practical, then a Gauss-Newton approach could be used and the update becomes:</span>\n<marimo-tex class=\"arithmatex\">||[\\Delta \\mathbf{m} = (G^T \\mathbf{C}_d^{-1} G)^{-1} G^T \\mathbf{C}_d^{-1} \\Delta \\mathbf{d}||]</marimo-tex><span class=\"paragraph\">Iterative approaches require a starting model or initial guess at the model parameters <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex>. This needs to be added to the <code>BaseProblem</code>. Note that there is no need to create a new <code>BaseProblem</code>\u2014the existing one can be updated.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "fff4b429836cc6d4826393146ca4d051",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "f4c233eeccf024cd63f3c6517e581068",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The existing <code>InversionOptions</code> can also be reused by simply changing the solving method and tool.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aLJB",
+      "code_hash": "14d589d1102f9fdd4746902799ad1508",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "nHfw",
+      "code_hash": "2082ad228338b1855af739a324401c58",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Using the updated <code>BaseProblem</code> and <code>InversionOptions</code>, a new inversion can be created and run.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "xXTn",
+      "code_hash": "3ee93c474a44713656a5875033f2202f",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "AjVT",
+      "code_hash": "0dc1638ca73f68443ac288740af6471e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "pHFh",
+      "code_hash": "49b583f42caec1e26e30da082e75262d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">We can see then that the two approaches produce identical polynomial curves.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "NCOB",
+      "code_hash": "dc4d9ff81dcc3b0cb36e911606234ad8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"fitting-a-polynomial-bayesian-approach\">Fitting a polynomial - Bayesian approach</h3>\n<span class=\"paragraph\">Instead of finding a single best-fitting model, a Bayesian approach seeks the distribution of models that represent a compromise between fitting the data and being consistent with our prior beliefs. Here we seek to find <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m}|\\mathbf{d}_{obs})||)</marimo-tex>, which is often called the <marimo-tex class=\"arithmatex\">||({a ~posteriori}||)</marimo-tex>  probability density function (PDF) and represents the information we have on the model, <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex>, given the observed data, <marimo-tex class=\"arithmatex\">||(\\mathbf{d}_{obs}||)</marimo-tex>. Bayes' theorem states that this distribution is given by</span>\n<marimo-tex class=\"arithmatex\">||[p(\\mathbf{m}|\\mathbf{d}_{obs}) = K p(\\mathbf{d}_{obs}|\\mathbf{m})p(\\mathbf{m})||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m})||)</marimo-tex> is the <marimo-tex class=\"arithmatex\">||({a ~priori}||)</marimo-tex> or prior PDF, representing knowledge on <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex> before considering the data; <marimo-tex class=\"arithmatex\">||(p(\\mathbf{d}_{obs}|\\mathbf{m})||)</marimo-tex> is the Likelihood function, measuring how probable the data would be given any model, <marimo-tex class=\"arithmatex\">||(\\mathbf{m}||)</marimo-tex>; and <marimo-tex class=\"arithmatex\">||(K||)</marimo-tex> is some normalizing constant.</span>\n<span class=\"paragraph\">Usually direct examination of the posterior probability density function is only possible in simple cases and the practical goal is to draw random samples from <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m}|\\mathbf{d}_{obs})||)</marimo-tex> over model space and make inferences from the resulting ensemble of models.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aqbW",
+      "code_hash": "b817390c92f187363a63e2bc946f5b2c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"likelihood-function\">Likelihood function</h4>\n<span class=\"paragraph\">Data errors follow a Gaussian in this example, so a Likelihood function <marimo-tex class=\"arithmatex\">||(p({\\mathbf d}_{obs}| {\\mathbf m})||)</marimo-tex> can be defined as follows.</span>\n<marimo-tex class=\"arithmatex\">||[\np({\\mathbf d}_{obs} | {\\mathbf m}) \\propto \\exp \\left\\{- \\frac{1}{2} ({\\mathbf d}_{obs}-{\\mathbf d}_{pred}({\\mathbf m}))^T C_D^{-1} ({\\mathbf d}_{obs}-{\\mathbf d}_{pred}({\\mathbf m})) \\right\\}\n||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||({\\mathbf d}_{obs}||)</marimo-tex> represents the observed y values and <marimo-tex class=\"arithmatex\">||({\\mathbf d}_{pred}({\\mathbf m})||)</marimo-tex> are those predicted by the polynomial model <marimo-tex class=\"arithmatex\">||(({\\mathbf m})||)</marimo-tex>.  In practice, only the log of the Likelihood needs to be evaluated, <marimo-tex class=\"arithmatex\">||(\\log p({\\mathbf d}_{obs} | {\\mathbf m})||)</marimo-tex>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TRpd",
+      "code_hash": "95d542f5f077c2b25316261c495e0730",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TXez",
+      "code_hash": "4499724493ff6c4e29558109e9f4157b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"prior-distribution\">Prior distribution</h4>\n<span class=\"paragraph\">Bayesian sampling requires a prior probability density function, and it is not always obvious what the prior should be. Here a uniform prior within specified bounds is used.</span>\n<marimo-tex class=\"arithmatex\">||[\n\\begin{align}\np({\\mathbf m}) &amp;= \\frac{1}{V},\\quad  l_j \\le m_j \\le u_j, \\quad (i=0,\\dots,M)\\\\\n         &amp;= 0, \\quad {\\rm otherwise},\n\\end{align}\n||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(l_j||)</marimo-tex> and <marimo-tex class=\"arithmatex\">||(u_j||)</marimo-tex> are lower and upper bounds on the model coefficient, <marimo-tex class=\"arithmatex\">||(m_j||)</marimo-tex> and V is the normalization constant for the prior PDF and equal to volume of the feasible model space</span>\n<marimo-tex class=\"arithmatex\">||[\nV = \\prod_{j=0}^M (u_j-l_j).\n||]</marimo-tex><span class=\"paragraph\">If the order of the polynomial is fixed, then <marimo-tex class=\"arithmatex\">||(V||)</marimo-tex> can be absorbed into the constnat <marimo-tex class=\"arithmatex\">||(K||)</marimo-tex> in Bayes' theorem and ignored. In the examples below the uniform prior distribution is used with <marimo-tex class=\"arithmatex\">||({\\mathbf l}^T = (-10.,-10.,-10.,-10.)||)</marimo-tex>, and <marimo-tex class=\"arithmatex\">||({\\mathbf u}^T = (10.,10.,10.,10.)||)</marimo-tex>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dNNg",
+      "code_hash": "dc27f94ae6fef824fcae7643e90597a0",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "yCnT",
+      "code_hash": "a4c0ae2d62ca0cd935162718ce405be5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"the-affine-invariant-markov-chain-monte-carlo-mcmc-ensemble-sampler\">The Affine Invariant Markov chain Monte Carlo (MCMC) Ensemble sampler</h4>\n<span class=\"paragraph\">Where possible, CoFI builds on existing approaches and makes them available through a common interface. This example uses <em>The Affine Invariant Markov chain Monte Carlo (MCMC) Ensemble sampler</em>\n<a href=\"https://msp.org/camcos/2010/5-1/p04.xhtml\" rel=\"noopener noreferrer\" target=\"_blank\">Goodman and Weare 2010</a> to sample the\nposterior distribution of the model. By default CoFI uses the implementation in the package <a href=\"https://emcee.readthedocs.io/en/stable/\" rel=\"noopener noreferrer\" target=\"_blank\">emcee</a>.</span>\n<span class=\"paragraph\">An advantage of this package is that only a small set of hyperparameters needs to be defined (e.g. the number of walkers, steps, and starting location). <marimo-tex class=\"arithmatex\">||(emcee||)</marimo-tex> has useful defaults for all others which can be changed if desired. See the docs for details <a href=\"https://emcee.readthedocs.io/en/stable/\" rel=\"noopener noreferrer\" target=\"_blank\">emcee</a>.</span>\n<span class=\"paragraph\">All walkers start in a small hypersphere around a chosen point <marimo-tex class=\"arithmatex\">||((0, 0, 0, 0)||)</marimo-tex>. Alternatively, any sample of the prior distribution may be chosen, or to improve convergence, a solution found through some preliminary minimization of the negative log-Likelihood.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "wlCL",
+      "code_hash": "382e37ec3a7193083cb9f40973ee0496",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "kqZH",
+      "code_hash": "87099dae39d1444560041dcd80a0d1e4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"augment-the-cofi-problem\">Augment the CoFI problem</h4>\n<span class=\"paragraph\">As when changing from a linear to an iterative approach, the <code>BaseProblem</code> defined previously can be augmented, rather than creating a completely new inverse problem set up. Below the BaseProblem is extended, the emcee solver is specified in the InversionOptions object, and then these are combined to run a solution.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "wAgl",
+      "code_hash": "98ea398d9336d99c3b134ba6b2fa071b",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "rEll",
+      "code_hash": "5216c467319d08a862c6abaf7598c8c5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"analyze-posterior-distribution\">Analyze posterior distribution</h4>\n<span class=\"paragraph\">By default the raw sampler resulting object is attached to <code>cofi</code>'s inversion result. Optionally, it can be converted into an <code>arviz</code> data structure to have access to\na range of analysis functions. (See more details in <a href=\"https://python.arviz.org/en/latest/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">arviz documentation</a>).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dGlV",
+      "code_hash": "ab6ec766ec1c7dbbe2ba94c1c3927c40",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "SdmI",
+      "code_hash": "21c2b5fd8d1da79871458d8b894fa88e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Traceplots show parameter values across MCMC iterations, allowing to visually check whether the chain has converged and is mixing well. A healthy traceplot looks like random noise around a stable mean, while problems like slow drifts, getting stuck, or trends indicate the sampler hasn't properly explored the posterior distribution</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lgWD",
+      "code_hash": "8e6f26a1dd3d3cb7f3b392e6bd7a90a8",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "yOPj",
+      "code_hash": "701a644875d74e63f323d6973b84931d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Corner plots show the marginal and joint distributions of the parameters. The diagonal panels display each parameter's marginal posterior, while the off-diagonal panels reveal correlations between parameter pairs. They allow identifying problematic dependencies, highly correlated parameters can cause sampling difficulties and indicate potential identifiability issues.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "fwwy",
+      "code_hash": "942d17b4590f5f9baf0e747c58730323",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "LJZf",
+      "code_hash": "0cca74badaa5eb1e8a92f041cbb48908",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Posterior predictive plots compare data simulated from recovered model against the actual observed data. If the posterior distribution captures the data-generating process well, simulated data should look similar to observed data. This serves as a sanity check\u2014systematic discrepancies revealing where a model fails to capture important features of the data, guiding model refinement.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "urSm",
+      "code_hash": "497ee5ae8bd1fb546edc7aff63579253",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "jxvo",
+      "code_hash": "fcd779d5b8acf7e13ae549c34dc49a41",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The ensemble of polynomial coefficients found during Bayesian sampling correspond to curves that fit the data reasonably given the noise present. The spread of prediction curves at any point X gives uncertainty in the posterior prediction.</span>\n<span class=\"paragraph\">Next we consider a more complex regression problem involving real data. Here we will see that simple polynomial regression will be insufficient to capture the complexity of the data trends.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "mWxS",
+      "code_hash": "5b1aadc12ef18e71b6ebd5375818f031",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"sea-level-data\">Sea level data</h2>\n<span class=\"paragraph\">Earth's sea level has undergone dramatic changes over the past 35,000 years. During the Last Glacial Maximum (~21,000 years ago), vast ice sheets locked up so much water that global sea level sat approximately 130 metres below present levels. As the climate warmed, these ice sheets melted, and sea level rose\u2014but not at a constant rate.</span>\n<span class=\"paragraph\"><a href=\"https://www.pnas.org/doi/10.1073/pnas.1411762111\" rel=\"noopener noreferrer\" target=\"_blank\">Lambeck et al. (2014)</a> compiled ~1,000 sea level observations from \"far-field\" sites (locations distant from former ice margins, where the signal reflects global rather than local ice changes). Their reconstruction reveals a striking pattern: sea level remained relatively stable during the glacial maximum, then rose rapidly during deglaciation (~16.5 to 8.2 ka BP), before stabilising again through the late Holocene.</span>\n<span class=\"paragraph\">This history poses a natural question for data analysis: can such behaviour be captured with a simple mathematical model?</span>\n<span class=\"paragraph\">Below we begin by fitting polynomials to a portion of this sea level record. Polynomials are a natural starting point\u2014they're flexible, well-understood, and easy to fit. But as will become evident, a single polynomial struggles to represent data with fundamentally different behaviours in different time periods. The residuals reveal systematic patterns that signal model inadequacy.</span>\n<span class=\"paragraph\">This failure motivates a more appropriate approach: change-point regression, where the relationship between time and sea level can shift at a transition point.</span>\n<span class=\"paragraph\">With CoFI, moving from polynomial fitting to change-point detection requires only modest code changes\u2014letting us focus on the scientific insight rather than implementation details.</span>\n<h4 id=\"references\">References</h4>\n<blockquote>\n<span class=\"paragraph\">Sea level and global ice volumes from the Last Glacial Maximum to the Holocene, K. Lambeck, H. Rouby, A. Purcell, Y. Sun, and M. Sambridge, 2014. Proc. Nat. Acad. Sci., 111, no. 43, 15296-15303, doi:10.1073/pnas.1411762111.</span>\n</blockquote></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "CcZR",
+      "code_hash": "f3d400e4de5229cd0590bf3a643115ad",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"data\">Data</h3>\n<span class=\"paragraph\">First, load the data and generate a figure of Eustatic Sea-Level in metres relative to present day over the past 20,000 years.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "YWSi",
+      "code_hash": "20e7da1170903aa3d25076fdda957f30",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "zlud",
+      "code_hash": "229fb0ae246aec6577aff8f485857b30",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "tZnO",
+      "code_hash": "3b853324ff3af4ea81860e4fd038b06b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"fitting-a-polynomial\">Fitting a Polynomial</h3>\n<span class=\"paragraph\">CoFI was already set up to fit a polynomial using emcee. Rather than creating a new problem from scratch, the existing <code>BaseProblem</code> can be updated with what has changed:</span>\n<ul>\n<li><strong>Data</strong> \u2014 sea level observations replace synthetic data</li>\n<li><strong>Data covariance</strong> \u2014 heteroscedastic (each point has its own uncertainty)</li>\n<li><strong>Log-likelihood and log-prior</strong> \u2014 must reference the new data and appropriate bounds</li>\n</ul>\n<span class=\"paragraph\">The generic <code>forward</code> and <code>jacobian</code> functions require no modification.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "xvXZ",
+      "code_hash": "2c97aa2cad7b1e29ca12c6521d1fd5a5",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "CLip",
+      "code_hash": "4e7614a67cf6e29383d9d1bd54ca9f54",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Now perform Bayesian sampling of product of Likelihood and prior using <marimo-tex class=\"arithmatex\">||({\\bf nwalkers}||)</marimo-tex> making <marimo-tex class=\"arithmatex\">||({\\bf nsteps}||)</marimo-tex> each.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "YECM",
+      "code_hash": "025913ef088191f40f62cf6f4b2bf3db",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "cEAS",
+      "code_hash": "8e9af4625bd932508c913a78e11892d8",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "iXej",
+      "code_hash": "5c1969d0dc408f1a49f5df69614126b9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"trace-plot\">Trace plot</h4></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "EJmg",
+      "code_hash": "b931cddcbbb452f720908d9aeb3ba7b6",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "UmEG",
+      "code_hash": "0adb56aaac6ee40652be57ef5dd61912",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"corner-plot\">Corner plot</h4></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vEBW",
+      "code_hash": "f28bf1a3ac6993a7eaa01a30a246e5ca",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "kLmu",
+      "code_hash": "1e2435ab36d56f62ba059fe262f11772",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">This 3rd order polynomial has tightly constrained model coefficients.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IpqN",
+      "code_hash": "06bf5dd401b1bb97dcb60cd767aec79e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"posterior-predictive-check\">Posterior predictive check</h4>\n<span class=\"paragraph\">The posterior predictive check reveals that the model is overdetermined. Like for the synthetic example, a range of green curves should envelope the observations. More importantly, the fitted model cannot explain the early observations.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "dxZZ",
+      "code_hash": "e66b0e9cb901803fcad36c5eb8276cc3",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "dlnW",
+      "code_hash": "35e9360faa17b3dd9e1e1308c213502f",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TTti",
+      "code_hash": "88b95f108e1e096adad5e4f335b849da",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Unfortunately the model class of a 3rd order polynomial can not capture the complex structure in the observations. Look how poorly the green curve fits the data. More flexibility and model detail is required.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RKFZ",
+      "code_hash": "2a21e3eac3aa4a87f7a79669f8cc02b3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"higher-order-polynomial-degree-10\">Higher-order polynomial (degree 10)</h3>\n<span class=\"paragraph\">A higher-order polynomial is now used as the model basis to see if it can better capture the sea level variations. Lets perform the Bayesian sampling with this new model basis.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "IaQp",
+      "code_hash": "7cedf201caae00ea11754a0a000b8cce",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "IWgg",
+      "code_hash": "2d75507f11027e3e26b59316c1c49cd0",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "fCoF",
+      "code_hash": "dd99cc93026f739a9f0325b9af6ec4e1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"posterior-predictive-check\">Posterior predictive check</h4>\n<span class=\"paragraph\">Lets have a look at the predicted curves from the sampled ensemble to see if they are any better.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "LkGn",
+      "code_hash": "3f42d60c43d8ec32b237bece58e3fae5",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "zVRe",
+      "code_hash": "717564964ba96d16d65f8e8bf8a50dc1",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">While the model class can predict the observed data better there are now two distinct groups of models indicating that model still is not able to adequately explain the observations. Thus this motivates in the next section to develop a model that allows to capture distinct changes between sea level change cycles.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "woaO",
+      "code_hash": "f2beb5d54f72c20bc5114983c259b1eb",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "HnMC",
+      "code_hash": "2d7c329bc9b9c080c2b93fbb6d53be50",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "wadT",
+      "code_hash": "eff7f5fe6b38c58553aa717a030fc62e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"trans-d-bayesian-sampling\">Trans-D Bayesian sampling</h3>\n<span class=\"paragraph\">In this case, an extra level sophistication is allowed by not only solving for the linear segment parameters <marimo-tex class=\"arithmatex\">||((x_i, y_i)||)</marimo-tex> in each partition but also the number of partitions <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex>. This creates a variably dimensioned sampling problem which can be addressed with Bayes' theorem. In this case we have</span>\n<marimo-tex class=\"arithmatex\">||[p(\\mathbf{m}, n|\\mathbf{d}) = K p(\\mathbf{d}|\\mathbf{m}, n)p(\\mathbf{m}|n)p(n)||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(p(\\mathbf{d}|\\mathbf{m}, n)||)</marimo-tex> is the Likelihood function of a given <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex> partitioned linear segment model; <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m}|n)||)</marimo-tex> is the prior for the model coefficients given <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex>; <marimo-tex class=\"arithmatex\">||(p(n)||)</marimo-tex> is the prior over <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex>, and <marimo-tex class=\"arithmatex\">||(K||)</marimo-tex> is some constant. In contrast to the earlier cases, the model vector <marimo-tex class=\"arithmatex\">||({\\bf m}||)</marimo-tex> now has dimension <marimo-tex class=\"arithmatex\">||(2n||)</marimo-tex>, where <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex> is also an unknown.  As before the <marimo-tex class=\"arithmatex\">||({a ~posteriori}||)</marimo-tex> distribution <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m}, n|\\mathbf{d})||)</marimo-tex> gives the probability density of (variably dimensioned) models supported by the data. The goal is to draw random samples from <marimo-tex class=\"arithmatex\">||(p(\\mathbf{m}, n|\\mathbf{d})||)</marimo-tex> over the variably dimensioned model space and make inferences from the resulting ensemble of model parameters.</span>\n<span class=\"paragraph\">This example makes use of a package known as <em>BayesBay</em> which implements the reversible jump MCMC algorithm of <a href=\"https://www.jstor.org/stable/2337340?seq=1\" rel=\"noopener noreferrer\" target=\"_blank\">Green (1992)</a> to sample the posterior distribution. (For more details see the <a href=\"https://bayes-bay.readthedocs.io/en/latest/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">bayesbay</a> documentation).</span>\n<h3 id=\"likelihood\">Likelihood</h3>\n<span class=\"paragraph\">Since data errors follow a Gaussian in this example, the Likelihood function <marimo-tex class=\"arithmatex\">||(p({\\mathbf d}_{obs}| {\\mathbf m})||)</marimo-tex> can be defined as before.</span>\n<marimo-tex class=\"arithmatex\">||[\np({\\mathbf d}_{obs} | {\\mathbf m}) \\propto \\exp \\left\\{- \\frac{1}{2} ({\\mathbf d}_{obs}-{\\mathbf d}_{pred}({\\mathbf m}))^T C_D^{-1} ({\\mathbf d}_{obs}-{\\mathbf d}_{pred}({\\mathbf m})) \\right\\}\n||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||({\\mathbf d}_{obs}||)</marimo-tex> represents the observed sea-level heights and <marimo-tex class=\"arithmatex\">||({\\mathbf d}_{pred}({\\mathbf m})||)</marimo-tex> are those predicted by the partition model unknowns <marimo-tex class=\"arithmatex\">||(({\\mathbf m})||)</marimo-tex>, where</span>\n<marimo-tex class=\"arithmatex\">||[\n{\\mathbf m} = \\left( n, y_1,y_2,\\dots,y_{n+1}; x_1, x_2,\\dots, x_{n-1} \\right)^T\n||]</marimo-tex><span class=\"paragraph\">The Likelihood is defined as the probability of observing the data actually observed, given a model. In practice, only the log of the Likelihood needs to be evaluated, <marimo-tex class=\"arithmatex\">||(\\log p({\\mathbf d}_{obs} | {\\mathbf m})||)</marimo-tex>.</span>\n<span class=\"paragraph\">This requires the inverse data covariance matrix describing the statistics of the noise in the data, <marimo-tex class=\"arithmatex\">||(C_D^{-1}||)</marimo-tex>. For this problem the data errors are independent with identical standard deviation in noise for each datum. Hence <marimo-tex class=\"arithmatex\">||(C_D^{-1} = \\frac{1}{\\sigma^2}I||)</marimo-tex> where <marimo-tex class=\"arithmatex\">||(\\sigma=1||)</marimo-tex>.</span>\n<h3 id=\"prior\">Prior</h3>\n<span class=\"paragraph\">Trans-D Bayesian sampling requires a prior probability density function for all unknowns.\nFor a given number of partitions, <marimo-tex class=\"arithmatex\">||(n||)</marimo-tex>, a uniform prior is used for both sea-level heights, y, and partition locations, x, within specified bounds</span>\n<marimo-tex class=\"arithmatex\">||[\n\\begin{align}\np({\\mathbf m}) &amp;= \\frac{1}{V},\\quad  l_i \\le m_i \\le u_i, \\quad (i=1,\\dots,2n)\\\\\n         &amp;= 0, \\quad \\text{otherwise},\n\\end{align}\n||]</marimo-tex><span class=\"paragraph\">where <marimo-tex class=\"arithmatex\">||(l_i||)</marimo-tex> and <marimo-tex class=\"arithmatex\">||(u_i||)</marimo-tex> are lower and upper bounds on the <marimo-tex class=\"arithmatex\">||(i||)</marimo-tex>th unknown, and <marimo-tex class=\"arithmatex\">||(V||)</marimo-tex> is a normalization constant, <marimo-tex class=\"arithmatex\">||(V = \\prod_{i=1}^{2n} (u_i-l_i)||)</marimo-tex>. A uniform prior over the number of partitions <marimo-tex class=\"arithmatex\">||(1\\le n \\le N_{max}||)</marimo-tex> is also used.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "VCRE",
+      "code_hash": "ba82a7ae2222fe1101b1325a32a74529",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"define-partition-model\">Define partition model</h3>\n<span class=\"paragraph\">To implement the partition model in BayesBay, the following must be defined:</span>\n<ol>\n<li><strong>Height parameters</strong> \u2014 The sea level values at each control point</li>\n<li><strong>Position parameters</strong> \u2014 The time locations of interior control points (the endpoints are fixed)</li>\n</ol>\n<span class=\"paragraph\">Uniform priors are used for all parameters. The heights are bounded by the observed data range (with some margin), while positions are constrained to lie within the time window.</span>\n<span class=\"paragraph\">BayesBay's <code>Voronoi1D</code> discretization handles the trans-dimensional aspect: the number of interior control points varies during sampling, with the algorithm proposing birth (add point), death (remove point), and move operations.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "hgqU",
+      "code_hash": "30f7ba88ba520100cc168deb1cddacf9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"height-priors\">Height priors</h4>\n<span class=\"paragraph\">Three types of height parameters are defined:</span>\n<ul>\n<li><code>y_start</code>: The sea level at the earliest time (fixed position)</li>\n<li><code>y_end</code>: The sea level at the most recent time (fixed position)</li>\n<li><code>y_inner</code>: Heights at interior control points (variable number and positions)</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PSUk",
+      "code_hash": "52099857727411f5794621317a47cc27",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "mfOT",
+      "code_hash": "05ad59ac18b7720c6314a6d4f92379d3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"parameterization\">Parameterization</h4>\n<span class=\"paragraph\">The parameterization combines two parameter spaces:</span>\n<ol>\n<li><strong>Inner space</strong> (<code>Voronoi1D</code>): Handles the variable number of interior control points. Each point has a position (time) and a height (sea level). The number of points can range from 1 to 15.</li>\n<li><strong>Outer space</strong> (<code>ParameterSpace</code>): Contains the fixed endpoint heights (<code>y_start</code> and <code>y_end</code>).</li>\n</ol>\n<span class=\"paragraph\">This separation allows BayesBay to efficiently propose trans-dimensional moves on the interior points while keeping the endpoints fixed.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vGiW",
+      "code_hash": "6c6f614bf213ef77da4a53f5c38b733d",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "SYQT",
+      "code_hash": "6d2d3da0759b764630aa860f838e7f0a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"forward-model\">Forward model</h4>\n<span class=\"paragraph\">The forward model for the partition representation computes predicted sea levels by linear interpolation between control points. Given the current state (positions and heights of all control points), it:</span>\n<ol>\n<li>Constructs the full set of control points by combining endpoints with interior points</li>\n<li>For each data point, identifies which segment it falls within</li>\n<li>Linearly interpolates the sea level value</li>\n</ol>\n<span class=\"paragraph\">This piecewise-linear model can capture abrupt changes in sea level rise rate\u2014something polynomial models struggle with.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bMrW",
+      "code_hash": "2f893bca6f7a495e326521abecc1f36a",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "PSQn",
+      "code_hash": "10f03b9e6b48c35c63d6f0097efb01ba",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"running-the-trans-dimensional-inversion\">Running the trans-dimensional inversion</h4>\n<span class=\"paragraph\">With CoFI, switching from emcee to BayesBay requires only updating the <code>InversionOptions</code>\u2014the same pattern used throughout this tutorial. BayesBay handles the trans-dimensional MCMC internally, proposing:</span>\n<ul>\n<li><strong>Birth moves</strong>: Add a new control point</li>\n<li><strong>Death moves</strong>: Remove an existing control point</li>\n<li><strong>Perturbation moves</strong>: Adjust positions or heights of existing points</li>\n</ul>\n<span class=\"paragraph\">The algorithm automatically balances model complexity against data fit, guided by the prior on the number of partitions.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "OfTS",
+      "code_hash": "db7f98d0bf330c8ab17fe77a467cba22",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "lQxp",
+      "code_hash": "76bfaff149cd4cace0a8e8c751ff100a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h4 id=\"plotting-results\">Plotting Results</h4>\n<span class=\"paragraph\">CoFI creates a result object from bayesbay that contains two piece sof information</span>\n<ol>\n<li><strong>Ensemble of sea level curves</strong> The median prediction of sea-level from the ensemble of solutions with uncertainty bounds shows how well the partition model captures the data.</li>\n<li><strong>Posterior on number of partitions</strong>  Describes the position ensemble of the number of partitions.</li>\n</ol></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Plbk",
+      "code_hash": "f74833c64cd8e933b342a3cdca613cc2",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "rSYo",
+      "code_hash": "3281eeddf9be10c82a0618c829ec7d96",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">In the figures we see</span>\n<ol>\n<li><strong>Ensemble of sea level curves</strong> (top panel): The piecewise-linear model can represent abrupt changes in sea level rise rate. and fits the data well.</li>\n<li><strong>Posterior on number of partitions</strong> (bottom panel): Comparing the posterior (blue) to the prior (orange) reveals whether the data inform the model complexity. A posterior concentrated at fewer partitions than the prior maximum suggests the data don't require high complexity\u2014the algorithm naturally favours simpler models that adequately explain the observations.</li>\n</ol>\n<span class=\"paragraph\">This automatic complexity selection is a key advantage of trans-dimensional inference: the number of change points does not need to be manually chosen.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "HuZB",
+      "code_hash": "c5b9ac504e670e650116169401a85e6e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"conclusion\">Conclusion</h2>\n<span class=\"paragraph\">This tutorial demonstrated how CoFI enables rapid exploration of increasingly sophisticated inference techniques:</span>\n<ol>\n<li><strong>Polynomial fitting</strong> \u2014 Starting with simple linear least squares, then moving to iterative optimization, and finally Bayesian sampling with emcee. Each transition required only minor code changes.</li>\n<li><strong>Model evaluation</strong> \u2014 Posterior predictive checks revealed that polynomials\u2014even high-order ones\u2014struggle to capture the sea level data's piecewise behaviour. Systematic residual patterns signalled model inadequacy.</li>\n<li><strong>Trans-dimensional inference</strong> \u2014 Motivated by the data, a partition model with BayesBay was adopted. The trans-dimensional approach automatically determines appropriate model complexity, avoiding manual selection of the number of change points.</li>\n</ol>\n<h3 id=\"key-takeaways\">Key takeaways</h3>\n<ul>\n<li><strong>Unified interface</strong>: CoFI's consistent API (<code>BaseProblem</code>, <code>InversionOptions</code>, <code>Inversion</code>) means switching between methods\u2014matrix solvers, optimizers, samplers\u2014requires only updating configuration, not rewriting code.</li>\n<li><strong>Reusable objects</strong>: Throughout this tutorial, the same <code>inv_problem</code> and <code>inv_options</code> objects were reused, progressively updating them as the analysis evolved. This mirrors authentic scientific workflows where models are iteratively refined.</li>\n<li><strong>Focus on science</strong>: By handling implementation details, CoFI lets learners concentrate on the scientific questions: <em>Which model best describes my data? How certain are my conclusions? Is my model complex enough\u2014or too complex?</em></li>\n</ul>\n<span class=\"paragraph\">These capabilities make CoFI particularly valuable for education, where the goal is conceptual understanding without the distraction of focusing on coding algorithms, data IO and plotting.</span>\n<hr />\n<span class=\"paragraph\"><em>Note: On Python 3.14+, you may see a harmless warning about \"leaked semaphore objects\" on shutdown. This is a known issue with the loky parallel processing library used by BayesBay and does not affect results.</em></span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "WfYj",
+      "code_hash": "9f0142b06cce57a6b372e4c90d5333c0",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}
