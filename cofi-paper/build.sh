@@ -6,7 +6,7 @@
 #   ./build.sh                    # build all notebooks (full mode)
 #   ./build.sh --fast             # build all notebooks in fast/dev mode
 #   ./build.sh educator.py        # build a single notebook
-#   ./build.sh --fast researcher.py  # build one notebook in fast mode
+#   ./build.sh --fast practitioner.py  # build one notebook in fast mode
 
 usage() {
     cat <<EOF
@@ -23,7 +23,7 @@ Examples:
   ./build.sh                       Build all notebooks (full mode)
   ./build.sh --fast                Build all notebooks in fast/dev mode
   ./build.sh educator.py           Build a single notebook
-  ./build.sh --fast researcher.py  Build one notebook in fast mode
+  ./build.sh --fast practitioner.py  Build one notebook in fast mode
 EOF
 }
 
@@ -47,7 +47,7 @@ for arg in "$@"; do
 done
 
 if [ ${#NOTEBOOKS[@]} -eq 0 ]; then
-    NOTEBOOKS=(educator.py researcher.py developer.py)
+    NOTEBOOKS=(educator.py practitioner.py developer.py)
 fi
 
 cd "$SCRIPT_DIR"
