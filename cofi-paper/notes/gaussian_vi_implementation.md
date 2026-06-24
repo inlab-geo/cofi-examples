@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `researcher_vi.py` notebook extends the nonlinear surface-wave tomography workflow
+The `practitioner_vi.py` notebook extends the nonlinear surface-wave tomography workflow
 with Gaussian variational inference (VI) via `cofi.gaussian_vi`. The solver approximates
 the posterior distribution over the slowness field with a Gaussian, parameterised by a
 mean vector and a sparse precision matrix, optimised by maximising the evidence lower
