@@ -86,7 +86,7 @@ Use `--fast` for a quick development build (1% rays, minimal MCMC iterations):
 
 ```bash
 ./build.sh --fast
-./build.sh --fast researcher.py
+./build.sh --fast practitioner.py
 ```
 
 Run `./build.sh --help` for full usage details.
