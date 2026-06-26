@@ -582,7 +582,9 @@ def _(mo):
 
 
 @app.cell
-def _(ccrs, np, plt, scm, seislib_plot_map, tomo):
+def _(australia_polygon, ccrs, np, plt, scm, seislib_plot_map, tomo):
+    import shapely as _shapely
+
     # Set up map projection and boundaries for plotting
     proj = ccrs.LambertConformal(
         central_longitude=135,
@@ -593,26 +595,49 @@ def _(ccrs, np, plt, scm, seislib_plot_map, tomo):
     transform = ccrs.PlateCarree()
     map_boundaries = [113, 153, -45, -8]
 
-    def plot_map(phase_velocity, title=None, grid_shape=None, extent=None, vmin=None, vmax=None):
-        """Plot a phase-velocity map.
+    def plot_map(phase_velocity, title=None, grid_shape=None, extent=None,
+                 lon_grid=None, lat_grid=None,
+                 cmap=None, colorbar_label='Phase velocity [km/s]',
+                 vmin=None, vmax=None):
+        """Plot a phase-velocity map, clipped to the Australia polygon.
 
-        For seislib grid: pass 1D phase_velocity array (uses tomo.grid.mesh).
-        For pyfm2d grid: pass 1D phase_velocity + grid_shape + extent.
+        Modes (determined by which arguments are passed):
+          - Fine pre-computed grid: lon_grid + lat_grid (2-D meshgrids)
+          - pyfm2d regular grid:   grid_shape + extent
+          - seislib equal-area:    neither (uses tomo.grid.mesh)
         """
+        if cmap is None:
+            cmap = scm.roma
+
         fig = plt.figure(figsize=(5, 6.5))
         ax = plt.subplot(111, projection=proj)
         ax.coastlines()
-        if grid_shape is not None and extent is not None:
+
+        if lon_grid is not None and lat_grid is not None:
+            _mask = _shapely.contains_xy(australia_polygon, lon_grid.ravel(), lat_grid.ravel())
+            _data = np.where(_mask, phase_velocity, np.nan)
+            img = ax.pcolormesh(lon_grid, lat_grid, _data.reshape(lon_grid.shape),
+                                cmap=cmap, transform=transform, shading='auto', vmin=vmin, vmax=vmax)
+            cb = fig.colorbar(img, ax=ax, orientation='horizontal', shrink=0.8, pad=0.05)
+        elif grid_shape is not None and extent is not None:
             _lon = np.linspace(extent[0], extent[1], grid_shape[0])
             _lat = np.linspace(extent[2], extent[3], grid_shape[1])
-            _lon_grid, _lat_grid = np.meshgrid(_lon, _lat)
-            img = ax.pcolormesh(_lon_grid, _lat_grid, phase_velocity.reshape(grid_shape).T,
-                                cmap=scm.roma, transform=transform, vmin=vmin, vmax=vmax)
+            _lon_g, _lat_g = np.meshgrid(_lon, _lat)
+            _data = phase_velocity.reshape(grid_shape).T
+            _mask = _shapely.contains_xy(australia_polygon, _lon_g.ravel(), _lat_g.ravel())
+            _data = np.where(_mask.reshape(_lon_g.shape), _data, np.nan)
+            img = ax.pcolormesh(_lon_g, _lat_g, _data, cmap=cmap, transform=transform, vmin=vmin, vmax=vmax)
             cb = fig.colorbar(img, ax=ax, orientation='horizontal', shrink=0.8, pad=0.05)
         else:
-            img, cb = seislib_plot_map(tomo.grid.mesh, phase_velocity, ax=ax, cmap=scm.roma, show=False,
+            _mesh = tomo.grid.mesh
+            _lons = (_mesh[:, 2] + _mesh[:, 3]) / 2
+            _lats = (_mesh[:, 0] + _mesh[:, 1]) / 2
+            _mask = _shapely.contains_xy(australia_polygon, _lons, _lats)
+            _vel = np.where(_mask, phase_velocity, np.nan)
+            img, cb = seislib_plot_map(tomo.grid.mesh, _vel, ax=ax, cmap=cmap, show=False,
                                        vmin=vmin, vmax=vmax)
-        cb.set_label('Phase velocity [km/s]')
+
+        cb.set_label(colorbar_label)
         ax.set_extent(map_boundaries, crs=transform)
         if title:
             ax.set_title(title)
@@ -620,6 +645,73 @@ def _(ccrs, np, plt, scm, seislib_plot_map, tomo):
         return fig
 
     return (plot_map,)
+
+
+@app.cell
+def _(ccrs, np, plt, scipy):
+    def plot_tessellation(voronoi_sites, values, ax, clip_polygon, cmap, vmin, vmax):
+        """Plot a clipped Voronoi tessellation on a geographic axes."""
+        from shapely.geometry import Polygon as _Polygon
+        bounds = clip_polygon.bounds
+        margin = 5
+        far_points = np.array([
+            [bounds[0] - margin, bounds[1] - margin],
+            [bounds[2] + margin, bounds[1] - margin],
+            [bounds[2] + margin, bounds[3] + margin],
+            [bounds[0] - margin, bounds[3] + margin],
+        ])
+        augmented_sites = np.vstack([voronoi_sites, far_points])
+        vor = scipy.spatial.Voronoi(augmented_sites)
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
+        transform = ccrs.PlateCarree()
+        for i in range(len(voronoi_sites)):
+            region_idx = vor.regions[vor.point_region[i]]
+            if -1 in region_idx or len(region_idx) == 0:
+                continue
+            region_poly = _Polygon(vor.vertices[region_idx])
+            clipped = region_poly.intersection(clip_polygon)
+            if clipped.is_empty:
+                continue
+            geoms = list(clipped.geoms) if clipped.geom_type == 'MultiPolygon' else [clipped]
+            color = cmap(norm(values[i]))
+            for g in geoms:
+                xs, ys = g.exterior.xy
+                ax.fill(xs, ys, color=color, transform=transform, linewidth=0.1, edgecolor='grey')
+
+    return (plot_tessellation,)
+
+
+@app.cell
+def _():
+    import cartopy.io.shapereader as _shpreader
+    from shapely.geometry import MultiPoint as _MultiPoint
+    from shapely.ops import unary_union as _unary_union
+
+    _shpfilename = _shpreader.natural_earth(
+        resolution='110m', category='cultural', name='admin_0_countries'
+    )
+    _reader = _shpreader.Reader(_shpfilename)
+    for _record in _reader.records():
+        if _record.attributes['NAME'] == 'Australia':
+            _geom = _record.geometry
+            break
+
+    # Sort polygons by area — [0] mainland, [1] Tasmania, rest are tiny islands
+    _polys = sorted(_geom.geoms, key=lambda p: p.area, reverse=True)
+    _mainland = _polys[0]
+    _tasmania = _polys[1]
+
+    # Convex hull of southern mainland coast + Tasmania vertices bridges Bass Strait
+    # naturally — spans the full 143–150°E crossing range of all 198 trans-strait rays.
+    # The hull chord cuts through the mainland interior, so unary_union → single Polygon.
+    _south_coast = [p for p in _mainland.exterior.coords
+                    if p[1] < -37.0 and 140.0 < p[0] < 152.0]
+    _bridge = _MultiPoint(_south_coast + list(_tasmania.exterior.coords)).convex_hull
+    australia_polygon = _unary_union([_mainland, _bridge])
+
+    print(f"Australia polygon: {australia_polygon.geom_type}")
+    print(f"  Bounds: {australia_polygon.bounds}")
+    return (australia_polygon,)
 
 
 @app.cell
@@ -1941,52 +2033,7 @@ def _(mo):
 @app.cell
 def _():
     import bayesbay as bb
-    from shapely.geometry import Polygon
-    import cartopy.io.shapereader as shpreader
-
-    return Polygon, bb, shpreader
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Australia Polygon
-
-    BayesBay's `Voronoi2D` discretisation requires a polygon defining the domain boundary. The Australian mainland coastline is extracted from Natural Earth shapefiles via cartopy.
-    """)
-    return
-
-
-@app.cell
-def _(shpreader):
-    from shapely.geometry import MultiPoint as _MultiPoint
-    from shapely.ops import unary_union as _unary_union
-
-    _shpfilename = shpreader.natural_earth(
-        resolution='110m', category='cultural', name='admin_0_countries'
-    )
-    _reader = shpreader.Reader(_shpfilename)
-    for _record in _reader.records():
-        if _record.attributes['NAME'] == 'Australia':
-            _geom = _record.geometry
-            break
-
-    # Sort polygons by area — [0] mainland, [1] Tasmania, rest are tiny islands
-    _polys = sorted(_geom.geoms, key=lambda p: p.area, reverse=True)
-    _mainland = _polys[0]
-    _tasmania = _polys[1]
-
-    # Convex hull of southern mainland coast + Tasmania vertices bridges Bass Strait
-    # naturally — spans the full 143–150°E crossing range of all 198 trans-strait rays.
-    # The hull chord cuts through the mainland interior, so unary_union → single Polygon.
-    _south_coast = [p for p in _mainland.exterior.coords
-                    if p[1] < -37.0 and 140.0 < p[0] < 152.0]
-    _bridge = _MultiPoint(_south_coast + list(_tasmania.exterior.coords)).convex_hull
-    australia_polygon = _unary_union([_mainland, _bridge])
-
-    print(f"Australia polygon: {australia_polygon.geom_type}")
-    print(f"  Bounds: {australia_polygon.bounds}")
-    return (australia_polygon,)
+    return (bb,)
 
 
 @app.cell(hide_code=True)
@@ -2270,39 +2317,13 @@ def _(mo):
 
 
 @app.cell
-def _(
-    australia_polygon,
-    bb_statistics_fine,
-    ccrs,
-    cmax,
-    cmin,
-    grid_lat_fine,
-    grid_lon_fine,
-    grid_points_fine,
-    np,
-    plt,
-    scm,
-):
-    import shapely as _shapely
-    _mask = _shapely.contains_xy(australia_polygon, grid_points_fine[:, 0], grid_points_fine[:, 1])
-    _mean = np.where(_mask, bb_statistics_fine['mean'], np.nan)
-    _proj = ccrs.LambertConformal(
-        central_longitude=135, central_latitude=-27,
-        cutoff=80, standard_parallels=(-18, -36),
+def _(bb_statistics_fine, cmax, cmin, grid_lat_fine, grid_lon_fine, plot_map):
+    fig_bb_mean = plot_map(
+        bb_statistics_fine['mean'],
+        title='Trans-dimensional Mean Velocity',
+        lon_grid=grid_lon_fine, lat_grid=grid_lat_fine,
+        vmin=cmin, vmax=cmax,
     )
-    _transform = ccrs.PlateCarree()
-    fig_bb_mean = plt.figure(figsize=(5, 6.5))
-    _ax = plt.subplot(111, projection=_proj)
-    _ax.coastlines()
-    _img = _ax.pcolormesh(
-        grid_lon_fine, grid_lat_fine, _mean.reshape(grid_lon_fine.shape),
-        cmap=scm.roma, transform=_transform, shading='auto', vmin=cmin, vmax=cmax,
-    )
-    _cb = fig_bb_mean.colorbar(_img, ax=_ax, orientation='horizontal', shrink=0.8, pad=0.05)
-    _cb.set_label('Phase velocity [km/s]')
-    _ax.set_extent([113, 153, -45, -8], crs=_transform)
-    _ax.set_title('Trans-dimensional Mean Velocity')
-    plt.tight_layout()
     fig_bb_mean
     return
 
@@ -2326,37 +2347,14 @@ def _(mo):
 
 
 @app.cell
-def _(
-    australia_polygon,
-    bb_statistics_fine,
-    ccrs,
-    grid_lat_fine,
-    grid_lon_fine,
-    grid_points_fine,
-    np,
-    plt,
-    scm,
-):
-    import shapely as _shapely
-    _mask = _shapely.contains_xy(australia_polygon, grid_points_fine[:, 0], grid_points_fine[:, 1])
-    _std = np.where(_mask, bb_statistics_fine['std'], np.nan)
-    _proj = ccrs.LambertConformal(
-        central_longitude=135, central_latitude=-27,
-        cutoff=80, standard_parallels=(-18, -36),
+def _(bb_statistics_fine, grid_lat_fine, grid_lon_fine, plot_map, scm):
+    fig_bb_std = plot_map(
+        bb_statistics_fine['std'],
+        title='Trans-dimensional Uncertainty',
+        lon_grid=grid_lon_fine, lat_grid=grid_lat_fine,
+        cmap=scm.imola,
+        colorbar_label='Std deviation [km/s]',
     )
-    _transform = ccrs.PlateCarree()
-    fig_bb_std = plt.figure(figsize=(5, 6.5))
-    _ax = plt.subplot(111, projection=_proj)
-    _ax.coastlines()
-    _img = _ax.pcolormesh(
-        grid_lon_fine, grid_lat_fine, _std.reshape(grid_lon_fine.shape),
-        cmap=scm.imola, transform=_transform, shading='auto',
-    )
-    _cb = fig_bb_std.colorbar(_img, ax=_ax, orientation='horizontal', shrink=0.8, pad=0.05)
-    _cb.set_label('Std deviation [km/s]')
-    _ax.set_extent([113, 153, -45, -8], crs=_transform)
-    _ax.set_title('Trans-dimensional Uncertainty')
-    plt.tight_layout()
     fig_bb_std
     return
 
@@ -2373,48 +2371,16 @@ def _(mo):
 
 @app.cell
 def _(
-    Polygon,
     australia_polygon,
     ccrs,
     cmax,
     cmin,
     np,
+    plot_tessellation,
     plt,
     saved_states,
-    scipy,
     scm,
 ):
-    def _plot_tessellation(voronoi_sites, values, ax, clip_polygon, cmap, vmin, vmax):
-        """Plot a clipped Voronoi tessellation on a geographic axes."""
-        # Add far-away points to make all Voronoi regions finite
-        bounds = clip_polygon.bounds
-        margin = 5
-        far_points = np.array([
-            [bounds[0] - margin, bounds[1] - margin],
-            [bounds[2] + margin, bounds[1] - margin],
-            [bounds[2] + margin, bounds[3] + margin],
-            [bounds[0] - margin, bounds[3] + margin],
-        ])
-        augmented_sites = np.vstack([voronoi_sites, far_points])
-        vor = scipy.spatial.Voronoi(augmented_sites)
-
-        norm = plt.Normalize(vmin=vmin, vmax=vmax)
-        transform = ccrs.PlateCarree()
-
-        for i in range(len(voronoi_sites)):
-            region_idx = vor.regions[vor.point_region[i]]
-            if -1 in region_idx or len(region_idx) == 0:
-                continue
-            region_poly = Polygon(vor.vertices[region_idx])
-            clipped = region_poly.intersection(clip_polygon)
-            if clipped.is_empty:
-                continue
-            geoms = list(clipped.geoms) if clipped.geom_type == 'MultiPolygon' else [clipped]
-            color = cmap(norm(values[i]))
-            for g in geoms:
-                xs, ys = g.exterior.xy
-                ax.fill(xs, ys, color=color, transform=transform, linewidth=0.1, edgecolor='grey')
-
     _proj = ccrs.LambertConformal(
         central_longitude=135, central_latitude=-27,
         cutoff=80, standard_parallels=(-18, -36)
@@ -2436,7 +2402,7 @@ def _(
         _vel = saved_states['voronoi.vel'][_idx]
         _n_cells = len(_vel)
 
-        _plot_tessellation(_sites, _vel, _ax, australia_polygon, scm.roma, _vmin, _vmax)
+        plot_tessellation(_sites, _vel, _ax, australia_polygon, scm.roma, _vmin, _vmax)
         _ax.coastlines(linewidth=0.5)
         _ax.set_extent([113, 153, -45, -8], crs=_transform)
         _ax.set_title(f'{_n_cells} cells', fontsize=9)
