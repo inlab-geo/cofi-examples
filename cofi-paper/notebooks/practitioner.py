@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.21.1"
+__generated_with = "0.23.11"
 app = marimo.App()
 
 
@@ -117,6 +117,19 @@ def _():
     for k, v in presets.items():
         print(f"  {k}: {v:,}" if isinstance(v, int) else f"  {k}: {v}")
     return presets, run_mode
+
+
+@app.cell
+def _(run_mode):
+    from pathlib import Path as _Path
+    save_figures = False
+    _suffix = "_allrays" if run_mode == "full" else "_100rays"
+    _fig_dir = _Path(__file__).resolve().parent.parent / "figures" / "practitioner"
+    def save_fig(fig, name):
+        if save_figures:
+            fig.savefig(_fig_dir / f"{name}{_suffix}.png", dpi=150, bbox_inches='tight')
+
+    return (save_fig,)
 
 
 @app.cell(hide_code=True)
@@ -722,9 +735,10 @@ def _():
 
 
 @app.cell
-def _(c_tentative, cmax, cmin, plot_map):
+def _(c_tentative, cmax, cmin, plot_map, save_fig):
     # Plot tentative solution
-    fig_tentative = plot_map(c_tentative, title=r"Tentative solution ($\mu=10^{-4}$)", vmin=cmin, vmax=cmax)
+    fig_tentative = plot_map(c_tentative, title=r"Linear inversion: Tentative solution ($\mu=10^{-4}$)", vmin=cmin, vmax=cmax)
+    save_fig(fig_tentative, 'Linear_trial')
     fig_tentative
     return
 
@@ -966,9 +980,10 @@ def _(
 
 
 @app.cell
-def _(lcurve):
+def _(lcurve, save_fig):
     # Plot L-curve
     fig_lcurve = lcurve.plot()
+    save_fig(fig_lcurve, 'Linear_Lcurve')
     fig_lcurve
     return
 
@@ -1007,10 +1022,11 @@ def _(Inversion, inv_options, inv_problem, lcurve, m0, regularization):
 
 
 @app.cell
-def _(c_final, cmax, cmin, mu_optimal, plot_map, scientific_label):
+def _(c_final, cmax, cmin, mu_optimal, plot_map, save_fig, scientific_label):
     # Plot final solution
-    fig_final = plot_map(c_final, title=r"Final solution ($\mu=%s$)" % scientific_label(mu_optimal, 2),
+    fig_final = plot_map(c_final, title=r"Linear inversion: Final solution ($\mu=%s$)" % scientific_label(mu_optimal, 2),
                          vmin=cmin, vmax=cmax)
+    save_fig(fig_final, 'Linear_final')
     fig_final
     return
 
@@ -1472,7 +1488,7 @@ def _(grid_resolution, np):
 
 
 @app.cell(hide_code=True)
-def _(ell, np, plt, use_gaussian_reg):
+def _(ell, np, plt, save_fig, use_gaussian_reg):
     _fig = None
     if use_gaussian_reg:
         from scipy.special import kv as _kv
@@ -1499,6 +1515,7 @@ def _(ell, np, plt, use_gaussian_reg):
         _ax.set_ylim(-0.02, 1.05)
         _ax.set_xlim(0, None)
         _fig.tight_layout()
+        save_fig(_fig, 'correlation_comparison')
         _fig
     return
 
@@ -1712,9 +1729,23 @@ def _(
 
 
 @app.cell
-def _(c_minimize, cmax, cmin, fm2d_extent, fm2d_grid_shape, plot_map):
-    fig_minimize = plot_map(c_minimize, title='scipy.optimize.minimize Result (L-BFGS-B)',
+def _(
+    c_minimize,
+    cmax,
+    cmin,
+    fm2d_extent,
+    fm2d_grid_shape,
+    plot_map,
+    save_fig,
+    use_gaussian_reg,
+):
+    if(use_gaussian_reg):
+        ptitle = 'Nonlinear inversion result: L-BFGS-B, SPDEMatern reg'
+    else:
+        ptitle = 'Nonlinear inversion result: L-BFGS-B, 2nd order Laplace reg'
+    fig_minimize = plot_map(c_minimize, title=ptitle,
                             grid_shape=fm2d_grid_shape, extent=fm2d_extent, vmin=cmin, vmax=cmax)
+    save_fig(fig_minimize, 'Nonlinear_LBFGSB')
     fig_minimize
     return
 
@@ -1800,7 +1831,7 @@ def _(mo):
     mo.md(r"""
     #### Optional Nonlinear L-curve
 
-    The next cell optionally calculates an optimal trade-off parameter $\mu$ via an L-curve calculation. This can be very expensive when many raypaths are calculated, so by default we skip it and use a previously calculated value of $\mu$.
+    The next cell optionally calculates an optimal trade-off parameter $\mu$ via an L-curve calculation for the nonlinear inversion case. This can be very expensive when many raypaths are calculated, so by default we skip it and use a previously calculated value of $\mu$. To perform nonlinear L-curve, set the toggle below to on.
     """)
     return
 
@@ -1955,9 +1986,23 @@ def _(
 
 
 @app.cell
-def _(c_nonlin, cmax, cmin, fm2d_extent, fm2d_grid_shape, plot_map):
-    fig_nonlin = plot_map(c_nonlin, title='CoFI Nonlinear Solver Result (scipy.optimize.least_squares)',
+def _(
+    c_nonlin,
+    cmax,
+    cmin,
+    fm2d_extent,
+    fm2d_grid_shape,
+    plot_map,
+    save_fig,
+    use_gaussian_reg,
+):
+    if(use_gaussian_reg):
+        ptitle2 = 'Nonlinear inversion result: Augmented, SPDEMatern reg'
+    else:
+        ptitle2 = 'Nonlinear inversion result: Augmented, 2nd order Laplace reg'
+    fig_nonlin = plot_map(c_nonlin, title=ptitle2,
                           grid_shape=fm2d_grid_shape, extent=fm2d_extent, vmin=cmin, vmax=cmax)
+    save_fig(fig_nonlin, 'Nonlinear_LS_aug')
     fig_nonlin
     return
 
@@ -2033,6 +2078,7 @@ def _(mo):
 @app.cell
 def _():
     import bayesbay as bb
+
     return (bb,)
 
 
@@ -2317,13 +2363,22 @@ def _(mo):
 
 
 @app.cell
-def _(bb_statistics_fine, cmax, cmin, grid_lat_fine, grid_lon_fine, plot_map):
+def _(
+    bb_statistics_fine,
+    cmax,
+    cmin,
+    grid_lat_fine,
+    grid_lon_fine,
+    plot_map,
+    save_fig,
+):
     fig_bb_mean = plot_map(
         bb_statistics_fine['mean'],
         title='Trans-dimensional Mean Velocity',
         lon_grid=grid_lon_fine, lat_grid=grid_lat_fine,
         vmin=cmin, vmax=cmax,
     )
+    save_fig(fig_bb_mean, 'RJMCMC-mean')
     fig_bb_mean
     return
 
@@ -2347,7 +2402,14 @@ def _(mo):
 
 
 @app.cell
-def _(bb_statistics_fine, grid_lat_fine, grid_lon_fine, plot_map, scm):
+def _(
+    bb_statistics_fine,
+    grid_lat_fine,
+    grid_lon_fine,
+    plot_map,
+    save_fig,
+    scm,
+):
     fig_bb_std = plot_map(
         bb_statistics_fine['std'],
         title='Trans-dimensional Uncertainty',
@@ -2355,6 +2417,7 @@ def _(bb_statistics_fine, grid_lat_fine, grid_lon_fine, plot_map, scm):
         cmap=scm.imola,
         colorbar_label='Std deviation [km/s]',
     )
+    save_fig(fig_bb_std, 'RJMCMC-uncertainty')
     fig_bb_std
     return
 
@@ -2378,6 +2441,7 @@ def _(
     np,
     plot_tessellation,
     plt,
+    save_fig,
     saved_states,
     scm,
 ):
@@ -2414,6 +2478,7 @@ def _(
     _cbar.set_label('Phase velocity [km/s]')
 
     plt.tight_layout()
+    save_fig(fig_bb_samples, 'Voronoi cell_along chain')
     fig_bb_samples
     return
 
