@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.7"
+__generated_with = "0.23.11"
 app = marimo.App()
 
 
@@ -23,6 +23,7 @@ def _():
 
     # Notebook interface
     import marimo as mo
+
     return (
         LogLikelihood,
         ParameterSpace,
@@ -124,6 +125,7 @@ def _(m_true, np, x_obs):
 
     def forward(m,x):
         return jacobian(x,m).dot(m)
+
     return forward, jacobian
 
 
@@ -172,6 +174,7 @@ def _(mo):
 def _(np, sigma, x_obs):
     def Cd_inv(sigma=sigma, obs_n=len(x_obs)):
         return 1/sigma**2 * np.identity(obs_n)
+
     return (Cd_inv,)
 
 
@@ -194,6 +197,7 @@ def _(mo):
 @app.cell
 def _():
     from cofi import BaseProblem, InversionOptions, Inversion
+
     return BaseProblem, Inversion, InversionOptions
 
 
@@ -428,6 +432,7 @@ def _(Cd_inv, forward, x_obs, y_obs):
         y_pred = forward(model, x_obs)
         residual = y_obs - y_pred
         return -0.5 * residual @  Cd_inv() @ residual
+
     return (log_likelihood,)
 
 
@@ -465,6 +470,7 @@ def _(np):
         for i in range(len(m_lower_bound)):
             if model[i] < m_lower_bound[i] or model[i] > m_upper_bound[i]: return -np.inf
         return 0.0 # model lies within bounds -> return log(1)
+
     return (log_prior,)
 
 
@@ -693,7 +699,20 @@ def _():
     from pathlib import Path as _Path
     def data_path(filename):
         return _Path(__file__).resolve().parent.parent / "data" / filename
+
     return (data_path,)
+
+
+@app.cell
+def _():
+    from pathlib import Path as _Path2
+    save_figures = True
+    _fig_dir = _Path2(__file__).resolve().parent.parent / "figures" / "educator"
+    def save_fig(fig, name):
+        if save_figures:
+            fig.savefig(_fig_dir / f"{name}.png", dpi=150, bbox_inches='tight')
+
+    return (save_fig,)
 
 
 @app.cell
@@ -766,6 +785,7 @@ def _(forward, np, slvl_age, slvl_sigma, slvl_y):
             if model[i] < slvl_m_lower[i] or model[i] > slvl_m_upper[i]:
                 return -np.inf
         return 0.0
+
     return slvl_Cd_inv, slvl_log_likelihood, slvl_log_prior, slvl_ndim
 
 
@@ -905,9 +925,9 @@ def _(mo):
 
 @app.cell
 def _(jacobian, np, plt):
-    def plot_posterior_predictive(sampler, x_obs, y_obs, sigma_obs, title=None):
+    def plot_posterior_predictive(sampler, x_obs, y_obs, sigma_obs, title=None, discard=10, label_fontsize=10, title_fontsize=10):
         """Plot posterior predictive samples against observations."""
-        flat_samples = sampler.get_chain(discard=10, thin=1, flat=True)
+        flat_samples = sampler.get_chain(discard=discard, thin=1, flat=True)
         inds = np.random.randint(len(flat_samples), size=100)
         x_plot = np.linspace(0, x_obs.max(), 200)
 
@@ -919,12 +939,13 @@ def _(jacobian, np, plt):
             lbl = "Posterior samples" if i == 0 else None
             ax.plot(x_plot, jacobian(x_plot, m_sample).dot(m_sample), color="seagreen", alpha=0.1, label=lbl)
 
-        ax.set_xlabel("Time before present (ka)")
-        ax.set_ylabel("ESL height (m)")
+        ax.set_xlabel("Time before present (ka)", fontsize=label_fontsize)
+        ax.set_ylabel("ESL height (m)", fontsize=label_fontsize)
         if title:
-            ax.set_title(title)
+            ax.set_title(title, fontsize=title_fontsize)
         ax.legend()
         return fig, ax
+
     return (plot_posterior_predictive,)
 
 
@@ -978,6 +999,7 @@ def _(forward, np, slvl_age, slvl_sigma, slvl_y):
             if model[i] < slvl_m_lower_10[i] or model[i] > slvl_m_upper_10[i]:
                 return -np.inf
         return 0.0
+
     return (
         slvl_Cd_inv_10,
         slvl_log_likelihood_10,
@@ -1038,8 +1060,68 @@ def _(
     _s = result_slvl_10.sampler
     print(f"emcee: {_s.nwalkers} walkers × {_s.get_chain().shape[0]} steps, {slvl_ndim_10} params")
     print(f"mean acceptance fraction: {_s.acceptance_fraction.mean():.3f}")
-
     return (result_slvl_10,)
+
+
+@app.cell
+def _(az, result_slvl_10):
+    _labels_10 = [f"m{i}" for i in range(11)]
+    az_idata_10 = az.from_emcee(result_slvl_10.sampler, var_names=_labels_10)
+    return (az_idata_10,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Trace plots (degree 10)
+
+    Inspect the trace plots to assess convergence and choose an appropriate burn-in.
+    """)
+    return
+
+
+@app.cell
+def _(az, az_idata_10):
+    def plot_trace_10():
+        pc = az.plot_trace(az_idata_10, figure_kwargs={"figsize": (12, 9)})
+        return pc
+    plot_trace_10()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The trace plot shows that it takes about 2500 chain steps for convergence, and so we set the burnin value to this number and discard 2500 steps in the analysis below.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Corner plot (degree 10)
+
+    Pairwise marginal distributions for all 11 parameters. Adjust the `burn_in_10` value
+    based on the trace plots above, then rerun to see the post-burn-in posteriors.
+    """)
+    return
+
+
+@app.cell
+def _(az, az_idata_10):
+    burn_in_10 = 2500
+    def plot_corner_10():
+        az.rcParams['plot.max_subplots'] = 150
+        pc = az.plot_pair(
+            az_idata_10.sel(draw=slice(burn_in_10, None, 10)),
+            marginal=True,
+            marginal_kind="kde",
+            figure_kwargs={"figsize": (14, 14)},
+        )
+        return pc
+    plot_corner_10()
+    return (burn_in_10,)
 
 
 @app.cell(hide_code=True)
@@ -1053,23 +1135,36 @@ def _(mo):
 
 
 @app.cell
-def _(plot_posterior_predictive, result_slvl_10, slvl_age, slvl_sigma, slvl_y):
+def _(
+    burn_in_10,
+    plot_posterior_predictive,
+    plt,
+    result_slvl_10,
+    save_fig,
+    slvl_age,
+    slvl_sigma,
+    slvl_y,
+):
     slvl_sampler_10 = result_slvl_10.sampler
-    plot_posterior_predictive(slvl_sampler_10, slvl_age, slvl_y, slvl_sigma, title="Degree 10 polynomial")
+    fig, _ = plot_posterior_predictive(slvl_sampler_10, slvl_age, slvl_y, slvl_sigma, title="Degree 10 polynomial", discard=burn_in_10, label_fontsize=20, title_fontsize=20)
+    save_fig(fig, 'Sea_level_polyfit_10')
+    plt.show()
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    While the model class can predict the observed data better there are now two distinct groups of models indicating that model still is not able to adequately explain the observations. Thus this motivates in the next section to develop a model that allows to capture distinct changes between sea level change cycles.
+    After roughly 2500 burn-in steps, the chains reach a stationary phase and the posterior is unimodal. We conclude here that a degree-10 polynomial can fit the data, but it's a global basis is prone to oscillation/overfitting at the ends of the data window. This motivates in the next section where we develop a partition model that uses the data to capture the time points where the character of sea level change varies in time.
     """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    img = mo.image(src="figures/partition_modelling_setup.png")
+    from pathlib import Path as _Path
+    _img = (_Path(__file__).resolve().parent.parent / "figures" / "educator" / "partition_modelling_setup.png").read_bytes()
+    img = mo.image(src=_img)
 
     mo.md(f"""
     ### Partition model
@@ -1393,13 +1488,14 @@ def _(
     plt,
     pspace_inner,
     results,
+    save_fig,
     slvl_age,
     slvl_y,
     statistics,
 ):
     # Plotting
 
-    fig = plt.figure(figsize=(10, 10))
+    _fig = plt.figure(figsize=(10, 10))
     gs = gridspec.GridSpec(2, 2, height_ratios=[2, 1])
 
     ax1 = plt.subplot(gs[0, :])  # First row, spans all columns
@@ -1414,11 +1510,11 @@ def _(
         label="Uncertainty (%s-%sth perc.)" % (percentiles),
     )
     ax1.plot(slvl_age, slvl_y, "ro", markeredgecolor="k", label="Obs. data")
-    ax1.set_xlabel("Time before present (ka)")
-    ax1.set_ylabel("ESL height (m)")
+    ax1.set_xlabel("Time before present (ka)", fontsize=20)
+    ax1.set_ylabel("ESL height (m)", fontsize=20)
     ax1.legend(framealpha=0.5)
     ax1.grid()
-    ax1.set_title("Partition model: Inferred sea level curve")
+    ax1.set_title("Partition model: Inferred sea level curve", fontsize=20)
 
 
     ndim_min, ndim_max = pspace_inner._n_dimensions_min, pspace_inner._n_dimensions_max
@@ -1431,7 +1527,7 @@ def _(
         ec="w",
         label="Prior",
     )
-    ax2.set_xlabel("No. partitions")
+    ax2.set_xlabel("No. partitions", fontsize=20)
     ax2.hist(
         results["pspace_inner.n_dimensions"],
         bins=np.arange(ndim_min - 0.5, ndim_max + 1.5),
@@ -1442,10 +1538,11 @@ def _(
         label="Posterior",
     )
     ax2.legend(framealpha=0)
-    ax2.set_title("Partitions")
+    ax2.set_title("Partitions", fontsize=20)
 
     ax2.legend(framealpha=0.9)
     plt.tight_layout()
+    save_fig(_fig, 'Sea_level_polyfit_TransD_mean')
     plt.show()
     return
 

@@ -94,7 +94,7 @@ def _(mo):
 @app.cell
 def _():
     # Set to "fast" (1% rays, minimal iterations) or "full" (all rays, full sampling)
-    run_mode = "full"
+    run_mode = "fast"
 
     _presets = {
         "fast": {
@@ -122,7 +122,7 @@ def _():
 @app.cell
 def _(run_mode):
     from pathlib import Path as _Path
-    save_figures = True
+    save_figures = False
     _suffix = "_allrays" if run_mode == "full" else "_100rays"
     _fig_dir = _Path(__file__).resolve().parent.parent / "figures" / "practitioner"
     def save_fig(fig, name):

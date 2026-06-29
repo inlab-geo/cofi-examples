@@ -116,14 +116,17 @@ def _(mcolors, np, plt):
         if ax is None:
             _, ax = plt.subplots(figsize=(6, 5))
 
-        levels = np.logspace(0, 3, 20)
+        levels = np.logspace(0, np.log10(2200), 22)
         cs = ax.contourf(
             X, Y, Z, levels=levels,
-            norm=mcolors.LogNorm(vmin=1, vmax=1000),
-            cmap="viridis", extend="both",
+            norm=mcolors.LogNorm(vmin=1, vmax=2200),
+            cmap="viridis", extend="min",
         )
         ax.contour(X, Y, Z, levels=levels, colors="k", linewidths=0.3, alpha=0.4)
-        plt.colorbar(cs, ax=ax, label="$f(x_1, x_2)$", shrink=0.8)
+        import matplotlib.ticker as _mticker
+        _cb = plt.colorbar(cs, ax=ax, label="$f(x_1, x_2)$", shrink=0.8)
+        _cb.set_ticks([1, 10, 100, 1000, 2200])
+        _cb.ax.yaxis.set_major_formatter(_mticker.FuncFormatter(lambda x, _: f'{x:g}'))
         ax.set_xlabel("$x_1$")
         ax.set_ylabel("$x_2$")
         ax.set_aspect("equal")
@@ -207,7 +210,8 @@ def _(
 
     ax_scipy.plot(*himmelblau_minima.T, "r*", ms=14, mew=0.5, label="True minima", zorder=6)
     ax_scipy.legend(loc="upper left")
-    fig_scipy.savefig("../figures/Himmelblau_scipy.png", dpi=150, bbox_inches="tight")
+    from pathlib import Path as _Path
+    fig_scipy.savefig(_Path(__file__).resolve().parent.parent / "figures" / "developer" / "Himmelblau_scipy.png", dpi=150, bbox_inches="tight")
     fig_scipy
     return
 
@@ -636,7 +640,8 @@ def _(himmelblau_minima, plot_himmelblau_landscape, plt, sma_multi_results):
         "o", ms=6, mew=1.0, color="0.5", mfc="0.5", label="SMA results", zorder=7,
     )
     ax_sma.legend(loc="upper left")
-    fig_sma.savefig("../figures/Himmelblau_sma.png", dpi=150, bbox_inches="tight")
+    from pathlib import Path as _Path
+    fig_sma.savefig(_Path(__file__).resolve().parent.parent / "figures" / "developer" / "Himmelblau_sma.png", dpi=150, bbox_inches="tight")
     fig_sma
     return
 
