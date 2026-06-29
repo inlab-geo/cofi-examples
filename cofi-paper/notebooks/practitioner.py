@@ -640,7 +640,7 @@ def _(australia_polygon, ccrs, np, plt, scm, seislib_plot_map, tomo):
             _mask = _shapely.contains_xy(australia_polygon, _lon_g.ravel(), _lat_g.ravel())
             _data = np.where(_mask.reshape(_lon_g.shape), _data, np.nan)
             img = ax.pcolormesh(_lon_g, _lat_g, _data, cmap=cmap, transform=transform, vmin=vmin, vmax=vmax)
-            cb = fig.colorbar(img, ax=ax, orientation='horizontal', shrink=0.8, pad=0.05)
+            cb = fig.colorbar(img, ax=ax, orientation='horizontal', shrink=0.8, pad=0.02)
         else:
             _mesh = tomo.grid.mesh
             _lons = (_mesh[:, 2] + _mesh[:, 3]) / 2
