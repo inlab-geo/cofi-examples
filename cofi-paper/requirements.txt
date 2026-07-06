@@ -6,7 +6,7 @@ scipy
 h5py
 arviz
 bayesbay
-cofi @ git+https://github.com/inlab-geo/cofi
+cofi>=0.2.12
 seislib
 cartopy
 cmcrameri
