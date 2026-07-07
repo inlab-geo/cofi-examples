@@ -16,7 +16,6 @@ dependencies:
   - pip
   - pip:
     - cofi>=0.2.8
-    - geo-espresso>=0.3.13
     - ipywidgets>=7.7.0
     - tqdm>=4.0
     - seislib>=0.6.7
