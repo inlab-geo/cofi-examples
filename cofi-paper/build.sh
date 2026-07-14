@@ -63,7 +63,11 @@ MODE_SUFFIX=$( [ ${#MARIMO_ARGS[@]} -gt 0 ] && echo "_fast" || echo "" )
 # If you already have a venv active, it will NOT be modified; this script runs
 # in a subprocess and only affects its own environment.
 VENV_DIR=""
+CURRENT_CMD_PID=""
 cleanup() {
+    if [ -n "${CURRENT_CMD_PID:-}" ] && kill -0 "$CURRENT_CMD_PID" 2>/dev/null; then
+        kill "$CURRENT_CMD_PID" 2>/dev/null
+    fi
     if [ -n "${VENV_DIR:-}" ] && [ -d "$VENV_DIR" ]; then
         echo ""
         echo "Removing temporary virtualenv..."
@@ -125,6 +129,48 @@ echo ""
 # in subprocess builds, which can hang without a proper AppKit event loop.
 export MPLBACKEND=Agg
 
+fmt_elapsed() {
+    local s=$1
+    printf '%dm%02ds' $((s / 60)) $((s % 60))
+}
+
+# ── Heartbeat-wrapped command runner ─────────────────────────────────────────
+# `marimo export html` and `marimo export ipynb --include-outputs` each
+# re-execute the *entire* notebook independently (the ipynb export does not
+# reuse the html export's run). For these notebooks — ray tracing, MCMC/
+# Bayesian inference — a full-mode run can legitimately take a long time, and
+# with no output in between, that looks identical to a hung process. This
+# wrapper streams the command's output live (as before) while also printing a
+# periodic heartbeat so "slow" is visibly distinguishable from "stuck".
+HEARTBEAT_INTERVAL=30
+
+run_with_heartbeat() {
+    local log_file="$1"
+    shift
+    local start=$SECONDS
+
+    ( "$@" 2>&1 | tee "$log_file"; exit "${PIPESTATUS[0]}" ) &
+    CURRENT_CMD_PID=$!
+    local cmd_pid=$CURRENT_CMD_PID
+
+    (
+        while kill -0 "$cmd_pid" 2>/dev/null; do
+            sleep "$HEARTBEAT_INTERVAL"
+            if kill -0 "$cmd_pid" 2>/dev/null; then
+                echo "  ... still running ($(fmt_elapsed $((SECONDS - start))) elapsed)"
+            fi
+        done
+    ) &
+    local hb_pid=$!
+
+    wait "$cmd_pid"
+    local status=$?
+    CURRENT_CMD_PID=""
+    kill "$hb_pid" 2>/dev/null
+    wait "$hb_pid" 2>/dev/null
+    return $status
+}
+
 echo "Building $TOTAL notebook(s) [mode: $MODE]"
 echo "Output directory: $OUTPUT_DIR"
 echo ""
@@ -150,12 +196,12 @@ for i in "${!NOTEBOOKS[@]}"; do
     echo "[$num/$TOTAL] Building $notebook ..."
 
     START_TIME=$SECONDS
-    if marimo export html "$notebook_path" -o "$output" "${MARIMO_ARGS[@]}" 2>&1 | tee "$LOG_FILE"; then
+    if run_with_heartbeat "$LOG_FILE" marimo export html "$notebook_path" -o "$output" "${MARIMO_ARGS[@]}"; then
         ELAPSED=$(( SECONDS - START_TIME ))
         if [ -f "$output" ]; then
             size=$(du -h "$output" | cut -f1)
             size_kb=$(du -k "$output" | cut -f1)
-            echo "[$num/$TOTAL] Done: $output ($size, ${ELAPSED}s)"
+            echo "[$num/$TOTAL] Done: $output ($size, $(fmt_elapsed $ELAPSED))"
             if [ "$size_kb" -lt 100 ]; then
                 echo "  WARNING: output is only ${size_kb}KB — notebook may have failed silently"
                 echo "  See log: $LOG_FILE"
@@ -166,15 +212,18 @@ for i in "${!NOTEBOOKS[@]}"; do
         # Full-mode only: also export a Jupyter notebook with outputs
         if [ ${#MARIMO_ARGS[@]} -eq 0 ]; then
             ipynb_output="$OUTPUT_DIR/${name}.ipynb"
-            if marimo export ipynb "$notebook_path" -o "$ipynb_output" --include-outputs 2>/dev/null; then
-                echo "[$num/$TOTAL] Jupyter: $ipynb_output"
+            IPYNB_LOG="$OUTPUT_DIR/${name}_ipynb.log"
+            IPYNB_START=$SECONDS
+            echo "[$num/$TOTAL] Exporting Jupyter notebook (re-runs the notebook; may take a while) ..."
+            if run_with_heartbeat "$IPYNB_LOG" marimo export ipynb "$notebook_path" -o "$ipynb_output" --include-outputs; then
+                echo "[$num/$TOTAL] Jupyter: $ipynb_output ($(fmt_elapsed $(( SECONDS - IPYNB_START ))))"
             else
-                echo "[$num/$TOTAL] WARNING: Jupyter export failed for $notebook"
+                echo "[$num/$TOTAL] WARNING: Jupyter export failed for $notebook (see $IPYNB_LOG)"
             fi
         fi
     else
         ELAPSED=$(( SECONDS - START_TIME ))
-        echo "[$num/$TOTAL] FAILED: $notebook (${ELAPSED}s)"
+        echo "[$num/$TOTAL] FAILED: $notebook ($(fmt_elapsed $ELAPSED))"
         echo "  See log: $LOG_FILE"
         FAILED=$((FAILED + 1))
         exit 1

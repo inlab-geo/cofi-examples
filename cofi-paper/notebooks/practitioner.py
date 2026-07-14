@@ -92,9 +92,11 @@ def _(mo):
 
 
 @app.cell
-def _():
-    # Set to "fast" (1% rays, minimal iterations) or "full" (all rays, full sampling)
-    run_mode = "fast"
+def _(mo):
+    # Controlled by build.sh: "fast" (1% rays, minimal iterations) via --fast,
+    # otherwise "full" (all rays, full sampling). Pass `-- --mode fast` /
+    # `-- --mode full` when running `marimo edit`/`run` directly.
+    run_mode = mo.cli_args().get("mode") or "full"
 
     _presets = {
         "fast": {
