@@ -93,10 +93,11 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Controlled by build.sh: "fast" (1% rays, minimal iterations) via --fast,
-    # otherwise "full" (all rays, full sampling). Pass `-- --mode fast` /
-    # `-- --mode full` when running `marimo edit`/`run` directly.
-    run_mode = mo.cli_args().get("mode") or "full"
+    # Fast/full preset from build.sh (`-- --mode fast/full`); falls back to "full" outside a marimo runtime (e.g. plain Jupyter).
+    try:
+        run_mode = mo.cli_args().get("mode") or "full"
+    except Exception:
+        run_mode = "full"
 
     _presets = {
         "fast": {
@@ -2476,7 +2477,7 @@ def _(
     # Add shared colorbar
     _sm = plt.cm.ScalarMappable(cmap=scm.roma, norm=plt.Normalize(vmin=_vmin, vmax=_vmax))
     _sm.set_array([])
-    _cbar = fig_bb_samples.colorbar(_sm, ax=_axes, orientation='horizontal', fraction=0.04, pad=0.05)
+    _cbar = fig_bb_samples.colorbar(_sm, ax=_axes, orientation='horizontal', fraction=0.04, pad=0.20)
     _cbar.set_label('Phase velocity [km/s]')
 
     plt.tight_layout()
