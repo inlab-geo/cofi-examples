@@ -93,7 +93,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Fast/full preset from build.sh (`-- --mode fast/full`); falls back to "full" outside a marimo runtime (e.g. plain Jupyter).
+    # Try/except block to allow non-marimo processing
     try:
         run_mode = mo.cli_args().get("mode") or "full"
     except Exception:
@@ -2474,13 +2474,14 @@ def _(
         _ax.set_extent([113, 153, -45, -8], crs=_transform)
         _ax.set_title(f'{_n_cells} cells', fontsize=9)
 
-    # Add shared colorbar
+    # Append shared colorbar
     _sm = plt.cm.ScalarMappable(cmap=scm.roma, norm=plt.Normalize(vmin=_vmin, vmax=_vmax))
     _sm.set_array([])
-    _cbar = fig_bb_samples.colorbar(_sm, ax=_axes, orientation='horizontal', fraction=0.04, pad=0.20)
+    fig_bb_samples.subplots_adjust(bottom=0.18, wspace=0.05, hspace=0.15)
+    _cbar_ax = fig_bb_samples.add_axes([0.25, 0.08, 0.5, 0.03])
+    _cbar = fig_bb_samples.colorbar(_sm, cax=_cbar_ax, orientation='horizontal')
     _cbar.set_label('Phase velocity [km/s]')
 
-    plt.tight_layout()
     save_fig(fig_bb_samples, 'Voronoi cell_along chain')
     fig_bb_samples
     return
