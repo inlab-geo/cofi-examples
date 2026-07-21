@@ -127,7 +127,8 @@ def _(run_mode):
     from pathlib import Path as _Path
     save_figures = False
     _suffix = "_allrays" if run_mode == "full" else "_100rays"
-    _fig_dir = _Path(__file__).resolve().parent.parent / "figures" / "practitioner"
+    _here = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+    _fig_dir = _here.parent / "figures" / "practitioner"
     def save_fig(fig, name):
         if save_figures:
             fig.savefig(_fig_dir / f"{name}{_suffix}.png", dpi=150, bbox_inches='tight')
@@ -214,7 +215,8 @@ def _(h5py, np, presets):
 
     # Load data from HDF5 file
     from pathlib import Path as _Path
-    with h5py.File(_Path(__file__).resolve().parent.parent / "data" / "sw_tomography.h5", "r") as f:
+    _here2 = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+    with h5py.File(_here2.parent / "data" / "sw_tomography.h5", "r") as f:
         all_observations = f["observations"][:]      # (15661,) slowness in s/m
         stations = f["stations"][:]                  # (1122, 2) [lat, lon]
         all_station_pairs = f["station_pairs"][:]    # (15661, 2) [sta1_idx, sta2_idx]

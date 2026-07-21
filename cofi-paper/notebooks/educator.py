@@ -698,7 +698,8 @@ def _(mo):
 def _():
     from pathlib import Path as _Path
     def data_path(filename):
-        return _Path(__file__).resolve().parent.parent / "data" / filename
+        _here = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+        return _here.parent / "data" / filename
 
     return (data_path,)
 
@@ -707,7 +708,8 @@ def _():
 def _():
     from pathlib import Path as _Path2
     save_figures = True
-    _fig_dir = _Path2(__file__).resolve().parent.parent / "figures" / "educator"
+    _here2 = _Path2(__file__).resolve().parent if "__file__" in globals() else _Path2.cwd()
+    _fig_dir = _here2.parent / "figures" / "educator"
     def save_fig(fig, name):
         if save_figures:
             fig.savefig(_fig_dir / f"{name}.png", dpi=150, bbox_inches='tight')
@@ -1163,7 +1165,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     from pathlib import Path as _Path
-    _img = (_Path(__file__).resolve().parent.parent / "figures" / "educator" / "partition_modelling_setup.png").read_bytes()
+    _here3 = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+    _img = (_here3.parent / "figures" / "educator" / "partition_modelling_setup.png").read_bytes()
     img = mo.image(src=_img)
 
     mo.md(f"""

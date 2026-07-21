@@ -211,7 +211,8 @@ def _(
     ax_scipy.plot(*himmelblau_minima.T, "r*", ms=14, mew=0.5, label="True minima", zorder=6)
     ax_scipy.legend(loc="upper left")
     from pathlib import Path as _Path
-    fig_scipy.savefig(_Path(__file__).resolve().parent.parent / "figures" / "developer" / "Himmelblau_scipy.png", dpi=150, bbox_inches="tight")
+    _here = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+    fig_scipy.savefig(_here.parent / "figures" / "developer" / "Himmelblau_scipy.png", dpi=150, bbox_inches="tight")
     fig_scipy
     return
 
@@ -641,7 +642,8 @@ def _(himmelblau_minima, plot_himmelblau_landscape, plt, sma_multi_results):
     )
     ax_sma.legend(loc="upper left")
     from pathlib import Path as _Path
-    fig_sma.savefig(_Path(__file__).resolve().parent.parent / "figures" / "developer" / "Himmelblau_sma.png", dpi=150, bbox_inches="tight")
+    _here = _Path(__file__).resolve().parent if "__file__" in globals() else _Path.cwd()
+    fig_sma.savefig(_here.parent / "figures" / "developer" / "Himmelblau_sma.png", dpi=150, bbox_inches="tight")
     fig_sma
     return
 
