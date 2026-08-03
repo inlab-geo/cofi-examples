@@ -20,7 +20,7 @@ Full builds also export Jupyter notebooks with outputs to `rendered/`:
 | [practitioner](rendered/practitioner.ipynb) | Surface wave tomography |
 | [developer](rendered/developer.ipynb) | Extending CoFI with custom solvers |
 
-These are generated with `--include-outputs` (outputs embedded) and require `nbformat`. They are not produced by `--fast` builds.
+These are generated with `--include-outputs` (outputs embedded) and require `nbformat`. This export pass is skipped by `--fast` builds. Each notebook renders in a fixed mode: educator and developer render in full mode; practitioner renders in fast mode (edit `run_mode` in `notebooks/practitioner.py` to render it in full mode).
 
 ## Development
 
@@ -82,7 +82,7 @@ Build a single notebook:
 ./build.sh educator.py
 ```
 
-Use `--fast` for a quick development build (1% rays, minimal MCMC iterations):
+Use `--fast` to skip the slower Jupyter (`.ipynb`) export pass:
 
 ```bash
 ./build.sh --fast
@@ -91,4 +91,4 @@ Use `--fast` for a quick development build (1% rays, minimal MCMC iterations):
 
 Run `./build.sh --help` for full usage details.
 
-This exports HTML pages with outputs to `rendered/`. Full builds (without `--fast`) also generate Jupyter notebooks (`.ipynb`) with outputs.
+This exports HTML pages with outputs to `rendered/`. Builds without `--fast` also generate Jupyter notebooks (`.ipynb`) with outputs. Educator and developer always render in full mode; practitioner always renders in fast mode via `build.sh` — full mode is 350,000 MCMC iterations and can take multiple hours, so it is never run automatically.

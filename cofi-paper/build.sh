@@ -2,11 +2,18 @@
 # Build HTML pages (with outputs) from marimo notebook sources
 # Outputs are committed in rendered/ and served through GitHub Pages
 #
+# Each notebook always builds in its own fixed mode: educator.py and
+# developer.py build in full mode (they're quick); practitioner.py always
+# builds in fast mode (full mode is 350,000 MCMC iterations and can take
+# multiple hours — it is never run automatically by this script; change
+# the run_mode default in notebooks/practitioner.py to produce a full-mode
+# rendering manually).
+#
 # Usage:
-#   ./build.sh                    # build all notebooks (full mode)
-#   ./build.sh --fast             # build all notebooks in fast/dev mode
+#   ./build.sh                    # build all notebooks + Jupyter notebooks
+#   ./build.sh --fast             # build all notebooks, skip the slow .ipynb export
 #   ./build.sh educator.py        # build a single notebook
-#   ./build.sh --fast practitioner.py  # build one notebook in fast mode
+#   ./build.sh --fast practitioner.py  # build one notebook, skip .ipynb export
 
 usage() {
     cat <<EOF
@@ -15,15 +22,20 @@ Usage: ./build.sh [--fast] [notebook.py ...]
 Build HTML pages (with outputs) from marimo notebook sources.
 Outputs are committed in rendered/ and served through GitHub Pages.
 
+Each notebook always builds in its own fixed mode: educator.py and
+developer.py build in full mode; practitioner.py always builds in fast
+mode (see notebooks/practitioner.py for how to produce a full-mode
+practitioner rendering manually).
+
 Options:
-  --fast    Use fast/development mode (1% rays, minimal iterations)
+  --fast    Skip the slower Jupyter (.ipynb) export pass
   --help    Show this help message
 
 Examples:
-  ./build.sh                       Build all notebooks (full mode)
-  ./build.sh --fast                Build all notebooks in fast/dev mode
+  ./build.sh                       Build all notebooks + .ipynb exports
+  ./build.sh --fast                Build all notebooks, skip .ipynb exports
   ./build.sh educator.py           Build a single notebook
-  ./build.sh --fast practitioner.py  Build one notebook in fast mode
+  ./build.sh --fast practitioner.py  Build one notebook, skip .ipynb export
 EOF
 }
 
@@ -37,10 +49,10 @@ OUTPUT_DIR="$SCRIPT_DIR/rendered"
 NOTEBOOK_DIR="$SCRIPT_DIR/notebooks"
 
 NOTEBOOKS=()
-MARIMO_ARGS=()
+SKIP_IPYNB=0
 for arg in "$@"; do
     if [ "$arg" = "--fast" ]; then
-        MARIMO_ARGS=(-- --mode fast)
+        SKIP_IPYNB=1
     else
         NOTEBOOKS+=("$arg")
     fi
@@ -54,8 +66,6 @@ cd "$SCRIPT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 TOTAL=${#NOTEBOOKS[@]}
-MODE=$( [ ${#MARIMO_ARGS[@]} -gt 0 ] && echo "fast" || echo "full" )
-MODE_SUFFIX=$( [ ${#MARIMO_ARGS[@]} -gt 0 ] && echo "_fast" || echo "" )
 
 # ── Ephemeral virtualenv ─────────────────────────────────────────────────────
 # A fresh venv is created for every build and deleted when the script exits —
@@ -171,8 +181,11 @@ run_with_heartbeat() {
     return $status
 }
 
-echo "Building $TOTAL notebook(s) [mode: $MODE]"
+echo "Building $TOTAL notebook(s)"
 echo "Output directory: $OUTPUT_DIR"
+if [ "$SKIP_IPYNB" -eq 1 ]; then
+    echo "(--fast: skipping .ipynb export)"
+fi
 echo ""
 
 BUILT=0
@@ -190,13 +203,25 @@ for i in "${!NOTEBOOKS[@]}"; do
     fi
 
     name="${notebook%.py}"
-    output="$OUTPUT_DIR/${name}${MODE_SUFFIX}.html"
+
+    # Each notebook has a fixed run mode, independent of --fast.
+    if [ "$notebook" = "practitioner.py" ]; then
+        marimo_args=(-- --mode fast)
+        suffix="_fast"
+        mode="fast"
+    else
+        marimo_args=()
+        suffix=""
+        mode="full"
+    fi
+
+    output="$OUTPUT_DIR/${name}${suffix}.html"
     LOG_FILE="$OUTPUT_DIR/${name}.log"
 
-    echo "[$num/$TOTAL] Building $notebook ..."
+    echo "[$num/$TOTAL] Building $notebook [mode: $mode] ..."
 
     START_TIME=$SECONDS
-    if run_with_heartbeat "$LOG_FILE" marimo export html "$notebook_path" -o "$output" "${MARIMO_ARGS[@]}"; then
+    if run_with_heartbeat "$LOG_FILE" marimo export html "$notebook_path" -o "$output" "${marimo_args[@]}"; then
         ELAPSED=$(( SECONDS - START_TIME ))
         if [ -f "$output" ]; then
             size=$(du -h "$output" | cut -f1)
@@ -209,13 +234,13 @@ for i in "${!NOTEBOOKS[@]}"; do
         fi
         BUILT=$((BUILT + 1))
 
-        # Full-mode only: also export a Jupyter notebook with outputs
-        if [ ${#MARIMO_ARGS[@]} -eq 0 ]; then
-            ipynb_output="$OUTPUT_DIR/${name}.ipynb"
+        # Unless --fast was given, also export a Jupyter notebook with outputs
+        if [ "$SKIP_IPYNB" -eq 0 ]; then
+            ipynb_output="$OUTPUT_DIR/${name}${suffix}.ipynb"
             IPYNB_LOG="$OUTPUT_DIR/${name}_ipynb.log"
             IPYNB_START=$SECONDS
             echo "[$num/$TOTAL] Exporting Jupyter notebook (re-runs the notebook; may take a while) ..."
-            if run_with_heartbeat "$IPYNB_LOG" marimo export ipynb "$notebook_path" -o "$ipynb_output" --include-outputs; then
+            if run_with_heartbeat "$IPYNB_LOG" marimo export ipynb "$notebook_path" -o "$ipynb_output" --include-outputs "${marimo_args[@]}"; then
                 echo "[$num/$TOTAL] Jupyter: $ipynb_output ($(fmt_elapsed $(( SECONDS - IPYNB_START ))))"
             else
                 echo "[$num/$TOTAL] WARNING: Jupyter export failed for $notebook (see $IPYNB_LOG)"
@@ -232,5 +257,5 @@ for i in "${!NOTEBOOKS[@]}"; do
 done
 
 echo "=========================================="
-echo "Build complete: $BUILT/$TOTAL succeeded [mode: $MODE]"
+echo "Build complete: $BUILT/$TOTAL succeeded"
 echo "=========================================="

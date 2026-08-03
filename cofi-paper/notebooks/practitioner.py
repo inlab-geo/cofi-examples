@@ -93,11 +93,19 @@ def _(mo):
 
 @app.cell
 def _(mo):
+    # ============================================================
+    # Change "fast" to "full" on the line directly below to
+    # replicate the models displayed in cofi-paper.
+    # WARNING: full mode runs 350,000 iterations and will take
+    # multiple hours to complete.
+    # ============================================================
+    DEFAULT_RUN_MODE = "fast"
+
     # Try/except block to allow non-marimo processing
     try:
-        run_mode = mo.cli_args().get("mode") or "full"
+        run_mode = mo.cli_args().get("mode") or DEFAULT_RUN_MODE
     except Exception:
-        run_mode = "full"
+        run_mode = DEFAULT_RUN_MODE
 
     _presets = {
         "fast": {
