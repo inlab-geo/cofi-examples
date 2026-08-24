@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.21.1"
+__generated_with = "0.23.11"
 app = marimo.App()
 
 
@@ -27,19 +27,7 @@ def _():
     # Notebook interface
     import marimo as mo
 
-    return (
-        BaseProblem,
-        Inversion,
-        InversionOptions,
-        ccrs,
-        cofi,
-        h5py,
-        mo,
-        np,
-        plt,
-        scipy,
-        scm,
-    )
+    return Inversion, ccrs, cofi, h5py, mo, np, plt, scipy, scm
 
 
 @app.cell(hide_code=True)
@@ -50,12 +38,10 @@ def _(mo):
     ## Introduction
 
     This notebook applies **Gaussian Variational Inference** (VI) to ambient noise
-    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver.
-
-    The deterministic inversions in the companion `researcher.py` notebook produce a
-    single "best" model but do not quantify **uncertainty**. Gaussian VI provides a
+    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver. This is an extension of the `paractioner.py` notebook. aussian VI provides a
     scalable approximation to the posterior distribution by fitting a multivariate
-    Gaussian, yielding both a posterior mean and a full covariance (uncertainty) estimate.
+    Gaussian, yielding both a posterior mean and a full covariance (uncertainty)
+    estimate.
 
     ### Method
 
@@ -465,14 +451,7 @@ def _(fm2d_grid_shape, np):
 
 
 @app.cell
-def _(
-    cofi,
-    ell,
-    fm2d_grid_shape,
-    grid_resolution,
-    m0_pyfm2d,
-    sigma,
-):
+def _(cofi, ell, fm2d_grid_shape, grid_resolution, m0_pyfm2d, sigma):
     _n_lon, _n_lat = fm2d_grid_shape
     _n_params = _n_lon * _n_lat
 
@@ -575,20 +554,60 @@ def _(
 ):
     _n_obs = len(d_obs_tt)
 
-    # Non-augmented forward and Jacobian for VI
+    # Forward and Jacobian for VI, both served from one logged, cached ray trace.
+    #
+    # Progress: the solver's `verbose=True` output is one line per MAP/VI
+    # iteration, but an iteration hides several full ray traces over ~1100
+    # sources, so without a line per trace the run looks hung for minutes.
+    #
+    # Cost: pyfm2d returns the travel times and the Frechet derivatives from
+    # the same eikonal solve -- the derivatives are accumulated while
+    # backtracking rays through a travel-time field that has already been
+    # computed (`rpaths2` in fm2dss.f90, gated on `cfd`). Measured on this grid
+    # they cost ~3% extra (268 ms/source vs 276 ms/source), so we always ask
+    # for both and cache them rather than tracing twice.
+    #
+    # cofi has no combined forward+Jacobian hook, so it evaluates the two
+    # separately at the same model: once per MAP iteration, once per VI sample.
+    # A MAP iteration's accepted line-search model is also bitwise the model
+    # the next iteration starts from. A single-entry cache therefore turns
+    # about half the ray traces into free lookups, with identical results.
+    import time as _time
+
+    _nfev = {"traces": 0, "hits": 0}
+    _cache = {"m": None, "d": None, "G": None}
+
+    def _traced(m, tag=""):
+        """Travel times and Jacobian at `m`, from cache or one logged ray trace."""
+        if _cache["m"] is not None and np.array_equal(_cache["m"], m):
+            _nfev["hits"] += 1
+            return _cache["d"], _cache["G"]
+        _nfev["traces"] += 1
+        _t0 = _time.perf_counter()
+        d, G = forward_pyfm2d(m, return_jacobian=True, progress=False)
+        # copy the model: the solver reuses and mutates its own arrays
+        _cache.update(m=np.array(m, copy=True), d=d, G=G)
+        _rms = np.sqrt(np.mean((d_obs_tt - d) ** 2))
+        print(
+            f"    [{_nfev['traces']:>4}] trace{' ' + tag if tag else '':<5}"
+            f" {_time.perf_counter() - _t0:6.1f}s  rms={_rms:.4f}s"
+            f"  ({_nfev['hits']} served from cache)",
+            flush=True,
+        )
+        return d, G
+
     def vi_forward(m):
-        return forward_pyfm2d(m, progress=False)
+        return _traced(m)[0]
 
     def vi_jacobian(m):
-        _, G = forward_pyfm2d(m, return_jacobian=True, progress=False)
-        return G
+        return _traced(m)[1]
 
     # Prior precision Q = R.T @ R (SPDE Matern, sparse)
     # No mu scaling — sigma is physically meaningful, C_d controls the balance
     Q_prior = (R_pyfm2d.T @ R_pyfm2d).tocsc()
 
     # --- Pass 1: rough sigma_d from residual at m0, run MAP only ---
-    _d_pred_m0 = forward_pyfm2d(m0_pyfm2d, progress=False)
+    _d_pred_m0 = _traced(m0_pyfm2d, tag="m0")[0]
     sigma_d_m0 = np.std(d_obs_tt - _d_pred_m0)
     print(f"Pass 1: rough sigma_d at m0 = {sigma_d_m0:.4f} s")
 
@@ -623,7 +642,7 @@ def _(
     m_map = _pass1.map_model
 
     # --- Pass 2: update sigma_d from residual at MAP, run full VI ---
-    _d_pred_map = forward_pyfm2d(m_map, progress=False)
+    _d_pred_map = _traced(m_map, tag="map")[0]
     sigma_d = np.std(d_obs_tt - _d_pred_map)
     print(f"\nPass 2: updated sigma_d at MAP = {sigma_d:.4f} s")
 
