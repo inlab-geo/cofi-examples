@@ -38,7 +38,7 @@ def _(mo):
     ## Introduction
 
     This notebook applies **Gaussian Variational Inference** (VI) to ambient noise
-    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver. This is an extension of the `paractioner.py` notebook. aussian VI provides a
+    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver. This is an extension of the `paractioner.py` notebook. Gaussian VI provides a
     scalable approximation to the posterior distribution by fitting a multivariate
     Gaussian, yielding both a posterior mean and a full covariance (uncertainty)
     estimate.
@@ -69,6 +69,64 @@ def _(mo):
     not by scaling Q. This keeps the prior physically interpretable: $\sigma$ means what it
     says, and tightening $\mathbf{C}_d$ (reducing assumed data noise) increases the data's
     relative weight.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Why natural gradients, and why sparsity is everything
+
+    VI replaces sampling with optimisation: choose $q(m) = \mathcal{N}(\mu,
+    \mathbf{\Omega}^{-1})$ and maximise the ELBO, which is the same as minimising
+    $\mathrm{KL}(q\,\|\,p(m \mid d))$.
+
+    Not by ordinary gradient ascent, though. An ordinary gradient depends on the
+    coordinates, so parameterising $q$ by its precision $\mathbf{\Omega}$ or by its
+    covariance $\mathbf{\Sigma} = \mathbf{\Omega}^{-1}$ would give different steps for
+    the same distribution. The **natural gradient** — the gradient in the space of
+    distributions — is invariant to that choice (Khan & Rue, 2023), and for a Gaussian
+    it is closed-form:
+
+    $$\mathbf{\Omega} \leftarrow (1-\rho_\Omega)\,\mathbf{\Omega} + \rho_\Omega\,
+    \mathbb{E}_q\!\left[\mathbf{J}^\top \mathbf{C}_d^{-1} \mathbf{J} + \mathbf{Q}\right],
+    \qquad
+    \mu \leftarrow \mu - \rho_\mu\,\mathbf{\Omega}^{-1}\,
+    \mathbb{E}_q\!\left[\nabla_m \mathcal{L}(m)\right]$$
+
+    with $\mathcal{L} = -\log p(d, m)$, the objective Gauss-Newton already minimises for
+    the MAP. The mean step is a Newton step preconditioned by the current uncertainty;
+    the precision step is a **convex combination**, not a gradient step, so it cannot
+    overshoot into a non-positive-definite $\mathbf{\Omega}$. The only new ingredient
+    over MAP is $\mathbb{E}_q[\cdot]$ — gradient and Hessian averaged over samples of
+    $q$ rather than evaluated at one point. That average is what turns a mode into a
+    distribution, and it is why every VI iteration costs `num_samples` ray traces.
+
+    **Both updates need $\mathbf{\Omega}^{-1}$** — a linear solve for the mean, a
+    Cholesky factor to draw the samples — and that is affordable only because
+    $\mathbf{\Omega}$ stays sparse. On this grid ($N = 19{,}456$ cells, 13,299 rays):
+
+    - $\mathbf{Q} = \mathbf{R}^\top\mathbf{R}$ is a local SPDE stencil — 12.9 nonzeros
+      per row.
+    - $\mathbf{J}$ is sparse because a ray only samples the cells it crosses — 67 per
+      row, 0.3% of the matrix.
+    - $\mathbf{J}^\top\mathbf{C}_d^{-1}\mathbf{J}$ couples every pair of cells that share
+      a ray, so it is denser than $\mathbf{J}$ but still structured: $\mathbf{\Omega}$
+      lands at 8.2M nonzeros, 2.2% dense, ~100 MB. CHOLMOD factorises that in ~2 s with
+      only 1.6$\times$ fill-in — negligible beside the ray trace that produced it.
+
+    (Measured at $m_0$. The forward model is nonlinear, so every sampled model bends its
+    rays a little differently and $\mathbf{\Omega}$ ends up carrying the union of their
+    patterns: one draw from $\mathcal{N}(m_0, \mathbf{\Omega}^{-1})$ adds ~10% more
+    nonzeros, taking it from 2.2% to 2.4% dense. That growth tracks the ray paths, not
+    the algebra — the update does no elimination, so nothing fills in the way forming
+    $\mathbf{\Omega}^{-1}$ would.)
+
+    Parameterising by the covariance instead would collapse the scheme:
+    $\mathbf{\Sigma} = \mathbf{\Omega}^{-1}$ is dense even when $\mathbf{\Omega}$ is not
+    — 3.0 GB to store at this grid size, and $O(N^3)$ to factorise, every iteration.
+    Sparsity is not an optimisation here; it is what makes the method run at all.
     """)
     return
 
@@ -345,15 +403,15 @@ def _(
     _uses = pyfm2d_worker_ready  # Ensure worker file is written first
     import os
 
-    # Determine number of parallel workers (use 25% of available CPUs to limit thermal load)
-    n_workers = max(1, (os.cpu_count() or 1) // 4)
+    # Determine number of parallel workers (use all available CPUs, as in practitioner.py)
+    n_workers = os.cpu_count() or 1
 
     def forward_pyfm2d(slowness_model, return_jacobian=False, progress=True):
         """Compute travel times (and optionally Jacobian) using pyfm2d.
 
         Uses ProcessPoolExecutor for parallel execution over sources with progress reporting.
         Process-based parallelism is required because pyfm2d's C/Fortran code is not thread-safe.
-        Workers are set to 25% of os.cpu_count() to limit thermal load.
+        Workers are set to os.cpu_count() so the pool uses all available cores.
 
         Parameters
         ----------
@@ -361,8 +419,12 @@ def _(
             Slowness model as a 1D array (n_cells,) in s/km.
         return_jacobian : bool
             If True, return (travel_times, jacobian).
-        progress : bool
-            If True, show progress bar.
+        progress : bool or callable
+            True shows a tqdm bar, False reports nothing. A callable is invoked
+            as progress(done, n_tasks, stage) while the trace runs, with stage
+            "trace" after each source completes and "assemble" once when the
+            sparse Jacobian blocks are being stacked -- see `_traced` below,
+            which uses it to print a throttled line-oriented progress log.
 
         Returns
         -------
@@ -390,20 +452,35 @@ def _(
             receivers = fm2d_receivers[rec_mask]
             tasks.append((src_idx, velocity, receivers, source, fm2d_extent, return_jacobian))
 
+        on_progress = progress if callable(progress) else None
+
         with ProcessPoolExecutor(max_workers=n_workers) as executor:
             # Submit all tasks
             futures = {executor.submit(compute_single_source, task): task[0] for task in tasks}
 
             iterator = as_completed(futures)
-            if progress:
+            if progress is True:
                 iterator = tqdm(iterator, total=len(futures), desc="Ray tracing", unit="src")
 
+            _done = 0
             for future in iterator:
                 src_idx, ttimes, frechet_data = future.result()
                 if ttimes is not None:
                     all_ttimes[src_idx] = ttimes
                     if return_jacobian and frechet_data is not None:
                         all_frechet[src_idx] = frechet_data
+                _done += 1
+                if on_progress is not None:
+                    on_progress(_done, len(futures), "trace")
+
+        # Stacking ~1100 sparse Frechet blocks and permuting them back into
+        # station_pairs order runs after the last source is done, so it is the
+        # one stretch a per-source counter cannot cover. Measured at ~0.02 s for
+        # this grid (4.7M nnz), so the line marks the hand-off rather than a
+        # wait -- but it is the boundary between "all sources traced" and
+        # "forward returned", which is where a silent tail would show up.
+        if on_progress is not None:
+            on_progress(len(futures), len(futures), "assemble")
 
         # Combine results in source order and reorder to station_pairs order
         ttimes_list = []
@@ -559,6 +636,9 @@ def _(
     # Progress: the solver's `verbose=True` output is one line per MAP/VI
     # iteration, but an iteration hides several full ray traces over ~1100
     # sources, so without a line per trace the run looks hung for minutes.
+    # A trace is itself minutes long, so one line per trace is still not enough
+    # -- it only prints once the trace is over. `_progress` below therefore
+    # reports from inside the trace as sources complete.
     #
     # Cost: pyfm2d returns the travel times and the Frechet derivatives from
     # the same eikonal solve -- the derivatives are accumulated while
@@ -577,20 +657,47 @@ def _(
     _nfev = {"traces": 0, "hits": 0}
     _cache = {"m": None, "d": None, "G": None}
 
+    # A single trace is minutes of work, so it also reports from inside itself:
+    # one line when it starts, one every _PROGRESS_EVERY seconds as sources
+    # complete, and one when the per-source Jacobians are stacked. Throttling on
+    # wall-clock rather than on a fraction of sources is deliberate -- sources
+    # carry very different receiver counts, so any fixed fraction still leaves
+    # long silent stretches, while a time budget bounds them by construction.
+    _PROGRESS_EVERY = 10.0
+    _prog = {"t0": 0.0, "last": 0.0}
+
+    def _progress(done, total, stage):
+        """Throttled within-trace progress, so a trace is never silent for long."""
+        _now = _time.perf_counter()
+        if stage == "assemble":
+            print(f"           assembling Jacobian from {total} sources...", flush=True)
+            return
+        if done < total and _now - _prog["last"] < _PROGRESS_EVERY:
+            return
+        _prog["last"] = _now
+        _elapsed = _now - _prog["t0"]
+        print(
+            f"           {done:>5}/{total} sources  {_elapsed:6.1f}s"
+            f"  eta {_elapsed * (total - done) / done:5.1f}s",
+            flush=True,
+        )
+
     def _traced(m, tag=""):
         """Travel times and Jacobian at `m`, from cache or one logged ray trace."""
         if _cache["m"] is not None and np.array_equal(_cache["m"], m):
             _nfev["hits"] += 1
             return _cache["d"], _cache["G"]
         _nfev["traces"] += 1
+        _label = f"    [{_nfev['traces']:>4}] trace{' ' + tag if tag else '':<5}"
+        print(f"{_label} started", flush=True)
         _t0 = _time.perf_counter()
-        d, G = forward_pyfm2d(m, return_jacobian=True, progress=False)
+        _prog.update(t0=_t0, last=_t0)
+        d, G = forward_pyfm2d(m, return_jacobian=True, progress=_progress)
         # copy the model: the solver reuses and mutates its own arrays
         _cache.update(m=np.array(m, copy=True), d=d, G=G)
         _rms = np.sqrt(np.mean((d_obs_tt - d) ** 2))
         print(
-            f"    [{_nfev['traces']:>4}] trace{' ' + tag if tag else '':<5}"
-            f" {_time.perf_counter() - _t0:6.1f}s  rms={_rms:.4f}s"
+            f"{_label} {_time.perf_counter() - _t0:6.1f}s  rms={_rms:.4f}s"
             f"  ({_nfev['hits']} served from cache)",
             flush=True,
         )
