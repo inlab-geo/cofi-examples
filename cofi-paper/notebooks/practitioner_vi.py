@@ -38,7 +38,8 @@ def _(mo):
     ## Introduction
 
     This notebook applies **Gaussian Variational Inference** (VI) to ambient noise
-    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver. This is an extension of the `paractioner.py` notebook. Gaussian VI provides a
+    surface wave tomography across Australia, using CoFI's `cofi.gaussian_vi` solver.
+    This is an extension of the `practitioner.py` notebook. Gaussian VI provides a
     scalable approximation to the posterior distribution by fitting a multivariate
     Gaussian, yielding both a posterior mean and a full covariance (uncertainty)
     estimate.
@@ -51,16 +52,19 @@ def _(mo):
        estimate, providing a good starting point.
     2. **Phase 2 — Gaussian VI**: Natural-gradient updates on the mean and precision of a
        Gaussian approximation to the posterior, tracked via the Evidence Lower Bound (ELBO).
-    3. **Phase 3 — Optional normalising flow**: A sinh-arcsinh transformation can capture
-       non-Gaussian features (skewness, heavy tails) in the posterior.
+    3. **Phase 3 — Optional normalising flow**: A sinh-arcsinh transformation
+       (Jones & Pewsey, 2009) can capture non-Gaussian features (skewness, heavy
+       tails) in the posterior.
 
-    All matrices remain sparse throughout (the solver uses CHOLMOD for sparse Cholesky
-    factorisation), making this feasible for the ~19,000-parameter grid.
+    The natural-gradient updates behind Phases 1-2 are those of the Bayesian learning
+    rule (Khan & Lin, 2017; Khan & Rue, 2023). All matrices remain sparse throughout
+    (the solver uses CHOLMOD for sparse Cholesky factorisation; Chen et al., 2008),
+    making this feasible for the ~19,000-parameter grid.
 
     ### Prior and data covariance
 
     The prior precision $\mathbf{Q} = \mathbf{R}^\top\mathbf{R}$ is built from an SPDE
-    Matérn operator with physically meaningful parameters:
+    Matérn operator (Lindgren et al., 2011) with physically meaningful parameters:
 
     - **$\sigma$** (prior std dev) encodes how much slowness can deviate from the background
     - **$\ell$** (correlation length) controls spatial smoothness
@@ -215,9 +219,10 @@ def _(mo):
     ## Forward model: pyfm2d ray tracing
 
     Travel times are computed using **pyfm2d**, which solves the eikonal equation via a
-    fast marching method. Unlike the linear (great circle) approximation, pyfm2d accounts
-    for ray bending through the velocity structure. The Jacobian (Fréchet derivative) is
-    computed alongside the travel times for use in the Gauss-Newton updates within VI.
+    fast marching method (Rawlinson & Sambridge, 2004). Unlike the linear (great circle)
+    approximation, pyfm2d accounts for ray bending through the velocity structure. The
+    Jacobian (Fréchet derivative) is computed alongside the travel times for use in the
+    Gauss-Newton updates within VI.
     """)
     return
 
@@ -618,6 +623,15 @@ def _(mo):
 
 
 @app.cell
+def _():
+    # Problem and options objects reconfigured by the two-pass VI cell below
+    from cofi import BaseProblem as _BP, InversionOptions as _IO
+    inv_problem = _BP()
+    inv_options = _IO()
+    return inv_options, inv_problem
+
+
+@app.cell
 def _(
     Inversion,
     R_pyfm2d,
@@ -877,13 +891,44 @@ def _(mo):
     return
 
 
-@app.cell
-def _():
-    # Create BaseProblem and InversionOptions (used by the VI cell above)
-    from cofi import BaseProblem as _BP, InversionOptions as _IO
-    inv_problem = _BP()
-    inv_options = _IO()
-    return inv_options, inv_problem
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## References
+
+    Chen, Y., Davis, T. A., Hager, W. W., & Rajamanickam, S. (2008). Algorithm 887:
+    CHOLMOD, supernodal sparse Cholesky factorization and update/downdate. *ACM
+    Transactions on Mathematical Software*, 35(3), Article 22.
+    https://doi.org/10.1145/1391989.1391995
+
+    Jones, M. C., & Pewsey, A. (2009). Sinh-arcsinh distributions. *Biometrika*, 96(4),
+    761-780. https://doi.org/10.1093/biomet/asp053
+
+    Khan, M. E., & Lin, W. (2017). Conjugate-computation variational inference:
+    Converting variational inference in non-conjugate models to inferences in conjugate
+    models. *Proceedings of the 20th International Conference on Artificial Intelligence
+    and Statistics (AISTATS)*, PMLR 54, 878-887.
+    https://proceedings.mlr.press/v54/khan17a.html
+
+    Khan, M. E., & Rue, H. (2023). The Bayesian learning rule. *Journal of Machine
+    Learning Research*, 24(281), 1-46. https://www.jmlr.org/papers/v24/22-0291.html
+
+    Lindgren, F., Rue, H., & Lindström, J. (2011). An explicit link between Gaussian
+    fields and Gaussian Markov random fields: The stochastic partial differential
+    equation approach. *Journal of the Royal Statistical Society: Series B (Statistical
+    Methodology)*, 73(4), 423-498. https://doi.org/10.1111/j.1467-9868.2011.00777.x
+
+    Magrini, F., Kastle, E., Pilia, S., Rawlinson, N., & De Siena, L. (2023). A new
+    shear-velocity model of continental Australia based on multi-scale surface-wave
+    tomography. *Journal of Geophysical Research: Solid Earth*, 128(7), e2023JB026688.
+    https://doi.org/10.1029/2023JB026688
+
+    Rawlinson, N., & Sambridge, M. (2004). Wave front evolution in strongly
+    heterogeneous layered media using the fast marching method. *Geophysical Journal
+    International*, 156(3), 631-647.
+    https://doi.org/10.1111/j.1365-246X.2004.02153.x
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -914,6 +959,7 @@ def _(mo):
         "scikit-sparse",
         "marimo",
         "pyfm2d",
+        "tqdm",
     ]
 
     _env_info = [{"Package": "Python", "Version": _sys.version.split()[0]}]
