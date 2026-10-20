@@ -1,0 +1,15 @@
+title: Ambient noise tomography with CoFI
+application domain: CoFI Examples -> EARTH SCIENCES -> Geophysics -> Seismology and seismic exploration -> Surface wave / ambient noise -> Surface Wave Tomography
+description: Mapping 5 s Rayleigh-wave phase velocity across Australia from ambient noise measurements, with linear, nonlinear, trans-dimensional Bayesian and variational inversions of the same dataset
+method:
+  surface_wave_tomography.ipynb:
+    description: "Linear inversion with great-circle rays (sparse solver and L-curve), nonlinear inversion with fast-marching ray tracing (L-BFGS-B and an augmented least-squares system), and trans-dimensional Bayesian sampling on Voronoi cells."
+    methods:
+      - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.sparse.linalg -> minres
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> L-BFGS-B
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.least_squares -> trf
+      - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler
+  surface_wave_tomography_variational_inference_extension.ipynb:
+    description: "MAP initialisation followed by natural-gradient Gaussian variational inference on a sparse SPDE Matern prior, with the data weight calibrated through the data covariance in two passes."
+    methods:
+      - CoFI -> Ensemble methods -> Variational inference -> cofi.gaussian_vi -> Gaussian VI
