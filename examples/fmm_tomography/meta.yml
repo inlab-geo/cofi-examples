@@ -6,11 +6,11 @@ method:
     description: Uses a simple matrix solver to perform regularised iterative inversion of a 2D travel time tomography problem in Cartesian co-ordinates.
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
-  fmm_tomography_regularization_discussion.ipynb:
+  fmm_tomography_regularization_options.ipynb:
     description: Uses a simple matrix solver to perform smoothing regularised iterative inversion of a 2D travel time tomography problem in Cartesian co-ordinates, repeats the inversion with a Gaussian prior as regularisation, and plots an L-curve for the smoothing weight.
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
-  fmm_tomography_solver_regularization.ipynb:
+  fmm_tomography_regularization_deep_dive.ipynb:
     description: Compares an iterative (minres) and an exact linear solver for the Gauss-Newton steps of a smoothing-only regularised 2D travel time tomography problem in Cartesian co-ordinates. The stopping tolerance of minres regularises the inversion implicitly, while the exact solver leaves a large left-to-right trend that neither the data nor the smoothing constrain. The notebook then adds damping, sets its weight relative to the smoothing from the size of the model, shows why the smoothing must dominate for Gauss-Newton to converge, and tunes the overall weight by cooling until chi^2/N = 1, with the L-curve as a cross-check.
     methods:
     - CoFI -> Parameter estimation -> Optimization -> Non linear -> cofi.simple_newton -> Newton's method in optimization
