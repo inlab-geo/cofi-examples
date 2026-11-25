@@ -4,7 +4,8 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
 
 ## Current state
 
-- Design agreed (`DESIGN.md`). **No code written yet.**
+- Design agreed (`DESIGN.md`). **Slice 1 (`run`) implemented and verified; waiting for the maintainer's diff
+  review (gate 5). Code not committed yet.**
 - Branch `nbtest`, created from `origin/main` at `d81ceb7`. Not pushed. The maintainer's checkout lives in a
   separate git worktree: `../cofi-examples` is on another branch (`gaussian-vi`) and must not be switched.
 - Nothing existing has been deleted or changed; old tools stay until the final cleanup step.
@@ -18,14 +19,14 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
 2. **First references** — in the reference image: run all, bless all; validate again in the same image to find
    non-deterministic notebooks; fix with seeds or `nbtest-skip`.
 3. **Validate** — number and figure comparison, annotations in staged notebooks; prototype on the smoke set, then
-   all 40 notebooks.
+   all 39 notebooks.
 4. **Publish** and remaining report details.
 5. **Cleanup commit** (only after the user confirms): remove `tools/run_notebooks/`, `tools/post_update.sh`,
    `.github/workflows/test_all_notebooks.yml`; rewrite `tools/README.md`. Keep `tools/validation/`.
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
 
-## Slice 1: `run` creates staged notebooks (spec approved 2026-11-25; gate 2, code, next)
+## Slice 1: `run` creates staged notebooks (gates 1–4 done 2026-11-25; gate 5, maintainer diff review, next)
 
 The first self-contained piece of step 1. Local mode only.
 
@@ -40,9 +41,10 @@ The first self-contained piece of step 1. Local mode only.
   **no `MPLBACKEND`**.
 - Writes `<name>.nbtest.ipynb` next to the original, atomically; adds `*.nbtest.ipynb` to `.gitignore`.
 - Stamps `metadata.nbtest` in the staged notebook: start time, duration, Python (`sys.prefix`, `sys.executable`),
-  status, hash of the original, hash of the staged file as written (later used by the edit guards).
+  status, hash of the original. (The hash of the staged file as written moves to `state.json` in slice 2.)
 - Terminal status per notebook: `ok`, `failed` (cell number + error), `timeout`, `skipped (missing: <pkg>)`
-  (top-level module not installed); summary line; exit code 0/1.
+  (only for modules listed in `tools/nbtest/optional_packages.txt` that are not installed); summary line; exit
+  code 0 / 1 (failed or timeout) / 2 (usage or target error) / 130 (Ctrl-C). Default timeout 3 h per notebook.
 - `./nbtest` wrapper as a thin shell around `python -m cofi_nbtest run`.
 - Errors (decided 2026-11-25): a `dependencies.txt` entry naming a missing notebook stops with an error; paths
   outside notebooks one folder below `examples/` and `tutorials/` are refused with an error.
@@ -68,23 +70,56 @@ checking for edits (nobody edits them yet).
    overwrites notebooks in place), run `tools/run_notebooks/run_notebooks.py` on the smoke notebooks and compare
    pass/fail per notebook with nbtest. Every disagreement must be explained.
 7. Ordering and prerequisites: `./nbtest run examples/vtem_max/three_survey_lines_smt_emcee.ipynb` lists
-   `three_survey_lines_latin_hypercube_sampling` then `three_survey_lines_surrogate_model_creation` as
-   prerequisites before the target (all `skipped (missing: …)` locally, since PyP223 and smt are not installed).
+   `three_survey_lines_latin_hypercube_sampling`, `three_survey_lines_surrogate_model_creation` and
+   `caber_preprocessing` (flat list, accepted 2026-11-25) as prerequisites before the target (all `skipped (missing: …)` locally, since PyP223 and smt are not installed).
    A typo'd `dependencies.txt` entry and a path outside the scope (e.g. `index.ipynb`) each give a clear error.
 
 **Gates** (each needs the maintainer's OK before the next):
 
 1. This spec approved. (done)
-2. Code written.
-3. Smoke run: raw output and before/after diff shown to the maintainer.
-4. Independent review by a fresh agent given the code and this spec, not the author's conclusions.
+2. Code written. (done)
+3. Smoke run: raw output and before/after diff shown to the maintainer. (done)
+4. Independent review by a fresh agent given the code and this spec, not the author's conclusions. (done; all
+   findings fixed and re-verified, see below)
 5. Maintainer reviews the diff; only then are code changes committed.
 
 **Limits:** image mode cannot be verified on this machine (no `.sif`); tolerances are unproven until slice 3.
 
+**Verification results (2026-11-25, local mode, `inlab` venv, Python 3.14.10):**
+
+- `./nbtest run @smoke`: 6 ok, `pygimli_ert` skipped (missing: pygimli), ~35 s, exit 0. Before/after snapshot:
+  only staged `*.nbtest.ipynb` files and `examples/xray_tomography/__pycache__/` appear; no tracked file changes.
+- Kernel Python recorded in every staged notebook = the `inlab` venv. Figure counts equal the committed
+  notebooks, except `slime_mould_algorithm_demo`: its committed cell 8 holds 5 stale figures from out-of-order
+  runs, while the code shows 1; nbtest's 1 is correct.
+- Timeout (`--timeout 1`, `--timeout 3`), single and triple Ctrl-C (exit 130, no traceback), dead kernel: no
+  leftover kernels, no temp files, existing staged copy untouched on Ctrl-C.
+- Old runner as oracle (scratch copy): agrees after explaining slime_mould (seaborn was installed in the venv
+  between the two runs).
+- Synthetic notebooks: `import numpyy` and a missing local helper → failed; `import cofi.xyz` → failed;
+  `import pygimli` (listed, not installed) → skipped; dependencies.txt typo → error, exit 2.
+
+**Independent review (fresh agent) findings and resolution:**
+
+1. Any unresolvable import was "skipped", exit 0 → only `optional_packages.txt` entries can be skipped (decided).
+2. Acceptance test 7 had 2 prerequisites; the flat list gives 3 → test updated (flat list accepted).
+3. Staged files were created 0600 → staged copy gets the original's permissions.
+4. dependencies.txt typos (non-`.ipynb` lines) were ignored → every non-blank, non-comment line must name an
+   existing notebook.
+5. Second Ctrl-C printed a traceback; Ctrl-C between notebooks not handled → handled.
+6. `staged_sha256` could not be the hash of the file itself → removed; moves to `state.json` (decided).
+7. Dead-kernel log showed only noise → known noise filtered; section omitted when empty.
+8. Kernel not stopping within the grace period → kernel killed, no staged copy written, reported as failed.
+9. Cancellation during kernel start-up relied on exit handlers → kernel process killed directly after each
+   notebook if still alive.
+10. "39 vs 40 notebooks" → explained: `variational_inference` exists only on `gaussian-vi`.
+
+**Notes for later slices:** ipykernel 7.3 prints "Kernel is running over TCP without encryption" per kernel
+(now hidden in the kernel log). `examples/xray_tomography` leaves a `__pycache__/` folder (ignored by git).
+
 ## Smoke-test set
 
-For development, use these (planned file `tools/nbtest/smoke.txt`, target `@smoke`). Run time is not a concern.
+For development, use these (`tools/nbtest/smoke.txt`, target `@smoke`). Run time is not a concern.
 
 | Notebook | Why |
 | --- | --- |

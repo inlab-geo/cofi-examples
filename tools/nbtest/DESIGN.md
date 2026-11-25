@@ -63,8 +63,12 @@ $ ./nbtest publish examples/fmm_tomography
   gitignored and skipped by notebook discovery.
 - Notebooks execute with their own folder as working directory (relative data paths keep working), the same
   folder a user gets when opening the staged copy in Jupyter.
-- `run` stores hashes of the staged notebook it wrote and of the original. If the staged copy was edited since,
-  `run` refuses to overwrite it (`--force` overrides). If the original changed since, `publish` refuses.
+- `run` records the hash of the original in the staged notebook's `metadata.nbtest` and (from slice 2) the hash
+  of the staged file as written in `state.json` — not inside the staged file, which cannot contain its own hash.
+  If the staged copy was edited since, `run` refuses to overwrite it (`--force` overrides). If the original
+  changed since, `publish` refuses.
+- Before running, all code-cell outputs are cleared, so cells after a failure never keep the original's
+  committed outputs. The staged copy gets the same file permissions as its original.
 
 ## References
 
@@ -137,8 +141,10 @@ Everything a notebook produces, by default: numbers in outputs, figures, errors,
 | No reference | no-ref | no-ref |
 | Everything within tolerance | pass | pass |
 
-- A package is "missing" only if its top-level module is not installed at all (`importlib.util.find_spec` in the
-  kernel's Python). `ModuleNotFoundError` for a submodule of an installed package (e.g. `cofi.xyz`) is a failure.
+- A package is "missing" (skipped) only if its top-level module is **listed in
+  `tools/nbtest/optional_packages.txt`** and is not installed at all (`importlib.util.find_spec`; in local mode the
+  kernel is verified to run nbtest's own Python). Any other `ModuleNotFoundError` is a failure: a typo
+  (`numpyy`), a deleted local helper module, or a submodule of an installed package (e.g. `cofi.xyz`).
 - `validate` exits 0 if nothing failed, 1 otherwise.
 - Sampler notebooks get no special handling. After the first bless, validating again in the same image reveals
   non-deterministic notebooks; fix with a seed or `nbtest-skip`.
@@ -187,8 +193,13 @@ over the original), `./nbtest validate --run <nb>`.
   changed (e.g. vtem_max's `three_survey_lines_lhs.npy`, which differs on every run unless seeded).
   See `STATUS.md` for the vtem_max file chain.
 - **Timeouts:** nbclient's `timeout` applies **per cell**, not per notebook. nbtest sets a per-cell timeout and
-  also enforces a wall-clock timeout per notebook with its own watchdog. After a timeout or Ctrl-C the kernel is
-  shut down; no `ipykernel` processes may be left behind.
+  also enforces a wall-clock timeout per notebook with its own watchdog; default **3 hours** per notebook
+  (`--timeout`). After a timeout or Ctrl-C the kernel is shut down (killed if it does not stop within 60 s);
+  no `ipykernel` processes may be left behind. Further Ctrl-C presses during shutdown are ignored.
+- Each notebook runs in a worker thread with its own event loop, so nbclient cannot install its own SIGINT
+  handler (which would swallow Ctrl-C and continue with the next notebook).
+- **Kernel process output** (the kernel's own stdout/stderr, not notebook outputs) goes to a temporary log and
+  is shown, minus ipykernel's harmless "running over TCP without encryption" warning, only when a kernel dies.
 - Staged notebooks and `state.json` are written atomically: a temporary file whose name does not end in `.ipynb`,
   then rename. This holds for failures and Ctrl-C too.
 - **Old runner interaction:** `tools/run_notebooks/run_notebooks.py` executes every `*.ipynb` in a folder, so
@@ -218,7 +229,8 @@ command and tag names are still `nbtest`.
 
 ## Scope
 
-In scope: notebooks one folder below `examples/` and `tutorials/` (40 on 2026-11-25).
+In scope: notebooks one folder below `examples/` and `tutorials/` (39 on `main` on 2026-11-25;
+`tutorials/variational_inference` exists only on the `gaussian-vi` branch).
 
 Out of scope: CI (run by hand); Docker (Apptainer only); building images and the `inlab-apptainer` definitions;
 `cofi-paper` marimo notebooks (own `build.sh`); standalone example `.py` scripts (`tools/validation/` keeps
@@ -248,4 +260,9 @@ testing them); per-notebook tolerances, statistical sampler checks, named `recor
 | Correction (2026-11-25): do not set `MPLBACKEND=Agg`; enforce a per-notebook wall-clock timeout on top of nbclient's per-cell timeout | Both verified empirically: `Agg` removes all inline figures; nbclient's `timeout` is per cell. |
 | No test framework (pytest suite) for nbtest itself (2026-11-25) | Maintainer decision; nbtest is verified by acceptance runs on the smoke set, a before/after side-effect check and the old runner as an oracle. |
 | `dependencies.txt` entry naming a missing notebook → error; paths outside the scope → error (2026-11-25) | A typo must not silently change the order; scope stays examples/ and tutorials/. |
+| Default notebook timeout 3 hours (2026-11-25) | Maintainer decision. |
+| Kernel process output to a log shown only when a kernel dies (2026-11-25) | Hides ipykernel's per-kernel warning noise but keeps crash information. |
+| Only packages in `optional_packages.txt` can be "skipped (missing)" (2026-11-25) | Independent review showed any unresolvable import (typo, deleted helper) was silently skipped with exit 0. |
+| Staged-file hash kept in `state.json` (slice 2), not inside the staged notebook (2026-11-25) | A file cannot contain its own hash; a blanked-field hash breaks when nbformat changes. |
+| `dependencies.txt` stays a flat per-folder list, even though single vtem_max targets then also run `caber_preprocessing` (2026-11-25) | Simplicity over precision; costs run time only for single-notebook targets. |
 | Not adopted (2026-11-25): `env --requirements` for Bob; `bless` refusing a different image sha256 | Considered in review; the user did not take them up. Do not re-add without asking. |
