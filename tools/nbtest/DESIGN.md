@@ -162,13 +162,18 @@ over the original), `./nbtest validate --run <nb>`.
   matplotlib, Pillow, optionally threadpoolctl) are listed in the README; missing ones give a clear message.
 - **Private kernel:** all notebooks request kernel `python3`, which Jupyter resolves through user kernelspecs and
   which may point at any Python. nbtest registers a temporary kernelspec in its own `JUPYTER_PATH` whose argv is
-  `[sys.executable, "-m", "ipykernel_launcher", "-f", "{connection_file}"]` and always uses it; it checks the
-  kernel's `sys.executable` matches `environment.json`.
+  `[sys.executable, "-m", "ipykernel_launcher", "-f", "{connection_file}"]` under a unique name (not `python3`)
+  and always uses it. It checks the kernel's `sys.prefix` and unresolved `sys.executable` match nbtest's own
+  (never compare `realpath`: a venv `python` is a symlink to the system interpreter). If `ipykernel` is not
+  importable in that Python, nbtest stops with a clear message.
 - **Image-mode isolation:** `apptainer exec --cleanenv`, `PYTHONNOUSERSITE=1`, a private `MPLCONFIGDIR`, the repo
   bind-mounted, and an entry script that puts nbtest on `sys.path` (do not override `PYTHONPATH`; images may set
   it, e.g. for pygimli). The wrapper checks it is at the repo root.
 - **Determinism (both modes):** `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` = 1,
-  `MPLBACKEND=Agg`, `PYTHONHASHSEED=0`.
+  `PYTHONHASHSEED=0`. **Never set `MPLBACKEND`** in the kernel's environment: with `MPLBACKEND=Agg` the kernel
+  does not use the inline backend and `plt.show()` produces no `image/png` outputs at all (verified 2026-11-25
+  with nbclient 0.11.0: 1 figure without it, 0 with `Agg`). Plot settings are pinned through the private
+  `MPLCONFIGDIR` (a matplotlibrc without a `backend` line) instead.
 - **Discovery:** `.ipynb` exactly one folder below `examples/` and `tutorials/` (excludes `archived/`), skipping
   `*.nbtest.ipynb`.
 - **Within a folder notebooks run sequentially**; different folders may run in parallel. Order: the entries of
@@ -181,8 +186,14 @@ over the original), `./nbtest validate --run <nb>`.
   snapshotted before and after; files a run created or modified are reported, with a warning when a tracked file
   changed (e.g. vtem_max's `three_survey_lines_lhs.npy`, which differs on every run unless seeded).
   See `STATUS.md` for the vtem_max file chain.
-- Per-notebook timeout. `state.json` is written atomically (temp file + rename) after every notebook, including
-  failures and Ctrl-C.
+- **Timeouts:** nbclient's `timeout` applies **per cell**, not per notebook. nbtest sets a per-cell timeout and
+  also enforces a wall-clock timeout per notebook with its own watchdog. After a timeout or Ctrl-C the kernel is
+  shut down; no `ipykernel` processes may be left behind.
+- Staged notebooks and `state.json` are written atomically: a temporary file whose name does not end in `.ipynb`,
+  then rename. This holds for failures and Ctrl-C too.
+- **Old runner interaction:** `tools/run_notebooks/run_notebooks.py` executes every `*.ipynb` in a folder, so
+  while both tools exist it would also execute and overwrite staged `*.nbtest.ipynb` copies. The old tools are
+  not changed during the build; delete staged copies before using the old runner.
 
 ## Files and layout
 
@@ -234,4 +245,5 @@ testing them); per-notebook tolerances, statistical sampler checks, named `recor
 | Internal package `cofi_nbtest` | `nbtest` is taken on PyPI. |
 | Review fixes 3–10 adopted (2026-11-25) | Tokenised number alignment, explicit timing exclusions only, source-hash cell matching, compare edited cells, publish guard, sequential per folder, nbclient + clear deps, figure-size handling. |
 | `dependencies.txt`: listed first then alphabetical, sequential per folder; prerequisites auto-run for single-notebook targets; run in place and report created/modified files; add `caber_preprocessing.ipynb` to vtem_max's list (2026-11-25) | vtem_max notebooks pass files to each other; a fresh clone lacks generated files; in-place matches editing the staged copy; `caber_inversion` only worked because its input is committed. |
+| Correction (2026-11-25): do not set `MPLBACKEND=Agg`; enforce a per-notebook wall-clock timeout on top of nbclient's per-cell timeout | Both verified empirically: `Agg` removes all inline figures; nbclient's `timeout` is per cell. |
 | Not adopted (2026-11-25): `env --requirements` for Bob; `bless` refusing a different image sha256 | Considered in review; the user did not take them up. Do not re-add without asking. |

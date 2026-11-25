@@ -25,6 +25,59 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
 
+## Slice 1: `run` creates staged notebooks (PROPOSED, not yet approved)
+
+The first self-contained piece of step 1. Local mode only.
+
+**In scope**
+
+- Target selection: `all`, a folder, notebook paths, `@smoke` (`tools/nbtest/smoke.txt`). Discovery exactly one
+  folder below `examples/` and `tutorials/`, skipping `*.nbtest.ipynb`.
+- `dependencies.txt`: fixed order and automatic prerequisites; add `caber_preprocessing.ipynb` to
+  `examples/vtem_max/dependencies.txt`.
+- Execution with `nbclient` and a private, uniquely named kernelspec using nbtest's own Python; working directory =
+  the notebook's folder; per-cell timeout plus per-notebook wall-clock watchdog; thread and hash-seed settings;
+  **no `MPLBACKEND`**.
+- Writes `<name>.nbtest.ipynb` next to the original, atomically; adds `*.nbtest.ipynb` to `.gitignore`.
+- Stamps `metadata.nbtest` in the staged notebook: start time, duration, Python (`sys.prefix`, `sys.executable`),
+  status, hash of the original, hash of the staged file as written (later used by the edit guards).
+- Terminal status per notebook: `ok`, `failed` (cell number + error), `timeout`, `skipped (missing: <pkg>)`
+  (top-level module not installed); summary line; exit code 0/1.
+- `./nbtest` wrapper as a thin shell around `python -m cofi_nbtest run`.
+- pytest tests in `tools/nbtest/tests/` for discovery, ordering, prerequisites and skipping staged files (no
+  notebook execution).
+
+**Out of scope for slice 1:** modes/image, `environment.json`, `state.json`/`REPORT.md`, validate, bless, publish,
+annotations, edit guards, reporting files changed by a run. Known risk: slice 1 overwrites staged copies without
+checking for edits (nobody edits them yet).
+
+**Acceptance tests**
+
+1. `./nbtest run @smoke`: six notebooks `ok`, or `failed` with a clear error; `pygimli_ert` reports
+   `skipped (missing: pygimli)`; seven staged files written.
+2. Side effects: snapshot `git status --porcelain --ignored` plus a file listing before and after; the difference
+   is exactly the staged files (plus `__pycache__`). No tracked file changes.
+3. Every staged notebook's `metadata.nbtest` names the `inlab` venv Python (`sys.prefix`).
+4. Figures: each staged notebook has as many `image/png` outputs as its code produces (checked against a run
+   without nbtest).
+5. Ctrl-C during a run and a forced timeout: clean stop, no half-written staged file, no leftover `ipykernel`
+   processes.
+6. **Oracle:** in a scratch copy of the worktree (never the worktree or the main checkout, since the old runner
+   overwrites notebooks in place), run `tools/run_notebooks/run_notebooks.py` on the smoke notebooks and compare
+   pass/fail per notebook with nbtest. Every disagreement must be explained.
+7. pytest tests pass.
+
+**Gates** (each needs the maintainer's OK before the next):
+
+1. This spec approved.
+2. Tests written and reviewed.
+3. Code written.
+4. Smoke run: raw output and before/after diff shown to the maintainer.
+5. Independent review by a fresh agent given the code and this spec, not the author's conclusions.
+6. Maintainer reviews the diff; only then are code changes committed.
+
+**Limits:** image mode cannot be verified on this machine (no `.sif`); tolerances are unproven until slice 3.
+
 ## Smoke-test set
 
 For development, use these (planned file `tools/nbtest/smoke.txt`, target `@smoke`). Run time is not a concern.
