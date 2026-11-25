@@ -25,7 +25,7 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
 
-## Slice 1: `run` creates staged notebooks (spec approved 2026-11-25; gate 2 next)
+## Slice 1: `run` creates staged notebooks (spec approved 2026-11-25; gate 2, code, next)
 
 The first self-contained piece of step 1. Local mode only.
 
@@ -44,8 +44,10 @@ The first self-contained piece of step 1. Local mode only.
 - Terminal status per notebook: `ok`, `failed` (cell number + error), `timeout`, `skipped (missing: <pkg>)`
   (top-level module not installed); summary line; exit code 0/1.
 - `./nbtest` wrapper as a thin shell around `python -m cofi_nbtest run`.
-- pytest tests in `tools/nbtest/tests/` for discovery, ordering, prerequisites and skipping staged files (no
-  notebook execution).
+- Errors (decided 2026-11-25): a `dependencies.txt` entry naming a missing notebook stops with an error; paths
+  outside notebooks one folder below `examples/` and `tutorials/` are refused with an error.
+- **No test framework for nbtest itself** (maintainer decision 2026-11-25): no pytest suite; nbtest is checked
+  through the acceptance tests below.
 
 **Out of scope for slice 1:** modes/image, `environment.json`, `state.json`/`REPORT.md`, validate, bless, publish,
 annotations, edit guards, reporting files changed by a run. Known risk: slice 1 overwrites staged copies without
@@ -65,16 +67,18 @@ checking for edits (nobody edits them yet).
 6. **Oracle:** in a scratch copy of the worktree (never the worktree or the main checkout, since the old runner
    overwrites notebooks in place), run `tools/run_notebooks/run_notebooks.py` on the smoke notebooks and compare
    pass/fail per notebook with nbtest. Every disagreement must be explained.
-7. pytest tests pass.
+7. Ordering and prerequisites: `./nbtest run examples/vtem_max/three_survey_lines_smt_emcee.ipynb` lists
+   `three_survey_lines_latin_hypercube_sampling` then `three_survey_lines_surrogate_model_creation` as
+   prerequisites before the target (all `skipped (missing: …)` locally, since PyP223 and smt are not installed).
+   A typo'd `dependencies.txt` entry and a path outside the scope (e.g. `index.ipynb`) each give a clear error.
 
 **Gates** (each needs the maintainer's OK before the next):
 
-1. This spec approved.
-2. Tests written and reviewed.
-3. Code written.
-4. Smoke run: raw output and before/after diff shown to the maintainer.
-5. Independent review by a fresh agent given the code and this spec, not the author's conclusions.
-6. Maintainer reviews the diff; only then are code changes committed.
+1. This spec approved. (done)
+2. Code written.
+3. Smoke run: raw output and before/after diff shown to the maintainer.
+4. Independent review by a fresh agent given the code and this spec, not the author's conclusions.
+5. Maintainer reviews the diff; only then are code changes committed.
 
 **Limits:** image mode cannot be verified on this machine (no `.sif`); tolerances are unproven until slice 3.
 
