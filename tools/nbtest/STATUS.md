@@ -25,7 +25,7 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
 
-## Slice 1: `run` creates staged notebooks (PROPOSED, not yet approved)
+## Slice 1: `run` creates staged notebooks (spec approved 2026-11-25; gate 2 next)
 
 The first self-contained piece of step 1. Local mode only.
 
