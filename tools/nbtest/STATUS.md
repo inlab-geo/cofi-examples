@@ -4,9 +4,10 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
 
 ## Current state
 
-- Design agreed (`DESIGN.md`). **Slice 1 (`run`) implemented and verified; waiting for the maintainer's diff
-  review (gate 5). Code not committed yet.**
-- Branch `nbtest`, created from `origin/main` at `d81ceb7`. Not pushed. The maintainer's checkout lives in a
+- Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) done: committed as `b063399` and pushed to
+  `origin/nbtest` on 2026-11-25.** Next: plan slice 2 with the maintainer (state.json/REPORT.md, environment.json,
+  modes; see Plan step 1).
+- Branch `nbtest`, created from `origin/main` at `d81ceb7`; pushed to `origin/nbtest` (tracking set). The maintainer's checkout lives in a
   separate git worktree: `../cofi-examples` is on another branch (`gaussian-vi`) and must not be switched.
 - Nothing existing has been deleted or changed; old tools stay until the final cleanup step.
 
@@ -26,7 +27,7 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
 
-## Slice 1: `run` creates staged notebooks (gates 1–4 done 2026-11-25; gate 5, maintainer diff review, next)
+## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
 The first self-contained piece of step 1. Local mode only.
 
@@ -81,7 +82,7 @@ checking for edits (nobody edits them yet).
 3. Smoke run: raw output and before/after diff shown to the maintainer. (done)
 4. Independent review by a fresh agent given the code and this spec, not the author's conclusions. (done; all
    findings fixed and re-verified, see below)
-5. Maintainer reviews the diff; only then are code changes committed.
+5. Maintainer reviews the diff; only then are code changes committed. (done: approved, committed and pushed)
 
 **Limits:** image mode cannot be verified on this machine (no `.sif`); tolerances are unproven until slice 3.
 
