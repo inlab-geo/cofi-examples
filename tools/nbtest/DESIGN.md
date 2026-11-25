@@ -171,9 +171,16 @@ over the original), `./nbtest validate --run <nb>`.
   `MPLBACKEND=Agg`, `PYTHONHASHSEED=0`.
 - **Discovery:** `.ipynb` exactly one folder below `examples/` and `tutorials/` (excludes `archived/`), skipping
   `*.nbtest.ipynb`.
-- **Within a folder notebooks run sequentially** (some write files the next one reads; see `dependencies.txt` in
-  `STATUS.md`); different folders may run in parallel. Files created or modified in the folder by a run are
-  reported.
+- **Within a folder notebooks run sequentially**; different folders may run in parallel. Order: the entries of
+  the folder's `dependencies.txt` (if any) in their order, then the remaining notebooks alphabetically.
+- **Prerequisites:** selecting a single notebook in a folder with `dependencies.txt` first runs the listed
+  prerequisites (those listed before it, if it is itself listed), so it works on a fresh clone where generated
+  files (e.g. vtem_max's `kriging_surrogate_model.pkl`) do not exist yet. They are shown as prerequisites in the
+  report.
+- **In place:** notebooks execute in their own folder, as when the staged copy is opened in Jupyter. The folder is
+  snapshotted before and after; files a run created or modified are reported, with a warning when a tracked file
+  changed (e.g. vtem_max's `three_survey_lines_lhs.npy`, which differs on every run unless seeded).
+  See `STATUS.md` for the vtem_max file chain.
 - Per-notebook timeout. `state.json` is written atomically (temp file + rename) after every notebook, including
   failures and Ctrl-C.
 
@@ -226,4 +233,5 @@ testing them); per-notebook tolerances, statistical sampler checks, named `recor
 | No special sampler handling | A second run in the same image exposes non-determinism; fix with seeds. |
 | Internal package `cofi_nbtest` | `nbtest` is taken on PyPI. |
 | Review fixes 3–10 adopted (2026-11-25) | Tokenised number alignment, explicit timing exclusions only, source-hash cell matching, compare edited cells, publish guard, sequential per folder, nbclient + clear deps, figure-size handling. |
+| `dependencies.txt`: listed first then alphabetical, sequential per folder; prerequisites auto-run for single-notebook targets; run in place and report created/modified files; add `caber_preprocessing.ipynb` to vtem_max's list (2026-11-25) | vtem_max notebooks pass files to each other; a fresh clone lacks generated files; in-place matches editing the staged copy; `caber_inversion` only worked because its input is committed. |
 | Not adopted (2026-11-25): `env --requirements` for Bob; `bless` refusing a different image sha256 | Considered in review; the user did not take them up. Do not re-add without asking. |

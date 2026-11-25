@@ -12,7 +12,8 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
 ## Plan
 
 1. **Run and report** — `./nbtest` wrapper, `mode`, `env`, `run` writing `*.nbtest.ipynb` with run/fail status,
-   `state.json` + `REPORT.md` after every notebook, private kernel, image-mode isolation. Covers what
+   `state.json` + `REPORT.md` after every notebook, private kernel, image-mode isolation, `dependencies.txt`
+   ordering and prerequisites, adding `caber_preprocessing.ipynb` to `examples/vtem_max/dependencies.txt`. Covers what
    `tools/run_notebooks/run_notebooks.py` does today.
 2. **First references** — in the reference image: run all, bless all; validate again in the same image to find
    non-deterministic notebooks; fix with seeds or `nbtest-skip`.
@@ -45,9 +46,8 @@ Later, image mode only: the vtem_max pair `three_survey_lines_latin_hypercube_sa
 
 1. **Reference figure resolution** — 400 px downscaled vs full resolution (~40 MB more). Asked as a comment in the
    shared design doc; not answered yet.
-2. **`dependencies.txt` handling** — proposal below, not yet agreed.
 
-### `dependencies.txt` (proposal, needs the user's decision)
+## `dependencies.txt` (agreed 2026-11-25)
 
 Facts (checked 2026-11-25, only `examples/vtem_max/` has a `dependencies.txt`):
 
@@ -60,7 +60,7 @@ Facts (checked 2026-11-25, only `examples/vtem_max/` has a `dependencies.txt`):
 - Not listed: `caber_preprocessing.ipynb` writes `caber_survey.npy` (**tracked**), which `caber_inversion.ipynb`
   reads. It works today only because the `.npy` is committed.
 
-Proposal:
+Agreed handling (also in `DESIGN.md`):
 
 1. Order within a folder: `dependencies.txt` entries in their order, then the remaining notebooks alphabetically
    (deterministic, unlike `os.listdir`). Always sequential within a folder.
@@ -70,7 +70,8 @@ Proposal:
 3. Execute in place (consistent with editing the staged copy in Jupyter). Snapshot the folder before and after;
    report created/modified files and warn when a tracked file was modified (e.g. the LHS `.npy`, which is random
    unless seeded).
-4. Add `caber_preprocessing.ipynb` to `examples/vtem_max/dependencies.txt` (a one-line data change).
+4. Add `caber_preprocessing.ipynb` to `examples/vtem_max/dependencies.txt` (a one-line data change; to do as
+   part of step 1, not done yet).
 
 ## Environment notes
 
