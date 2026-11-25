@@ -13,7 +13,9 @@ decision log and the current progress.
   runs show a need.
 - **Branch and worktree.** Work happens on the `nbtest` branch, in its own git worktree. Never switch the
   maintainer's main checkout (another branch is checked out there).
-- **Never commit or push without being asked.** Never delete existing tools (`tools/run_notebooks/`,
+- **Commit every Markdown file you create or change** in the nbtest work (e.g. `DESIGN.md`, `STATUS.md`) to the
+  `nbtest` branch straight away; the maintainer wants all docs committed there. Otherwise never commit code or
+  push without being asked. Never delete existing tools (`tools/run_notebooks/`,
   `tools/validation/`, workflows) before the final cleanup step is explicitly approved.
 - **Images.** Apptainer only. Do not download, build or modify images or the `inlab-apptainer` definitions;
   ask for a `.sif` path when image mode needs testing.
