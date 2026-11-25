@@ -1,0 +1,25 @@
+# Optional packages: top-level import names that some notebooks need but that a local environment may
+# lack. In local mode, a notebook that fails with ModuleNotFoundError for one of these (and the package
+# is genuinely not installed) is reported as "skipped (missing: <name>)". Any OTHER missing module is a
+# failure (a typo, a deleted local helper, a broken install). One name per line; "#" starts a comment.
+#
+# Built on 2026-11-25 from the notebooks' imports, excluding the standard library, local helper
+# modules, matplotlib/IPython, and cofi's own requirements (numpy, scipy, torch, emcee, arviz,
+# bayesbay, neighpy, mealpy, findiff).
+astroquery      # Finding_Neptune_Inversions
+cartopy         # sw_tomography
+cmcrameri       # sw_tomography
+numba           # Finding_Neptune_Inversions
+pandas          # linear_regression, vtem_max
+pyfm2d          # fmm_tomography, travel_time_tomography
+pygimli         # pygimli_dcip, pygimli_ert, electrical_resistivity_tomography
+pyhk            # sw_rf_joint
+pyp223          # vtem_max, thin_plate_inversion (imported via vtem_max_forward_lib)
+pyrf96          # receiver_function
+pysurf96        # rayleigh_wave_phase_velocity, sw_rf_joint
+seaborn         # metaheuristic_optimiser_tests
+seislib         # sw_tomography
+shapely         # sw_tomography
+smt             # vtem_max, thin_plate_inversion
+sympy           # metaheuristic_optimiser_tests
+tqdm            # Finding_Neptune_Inversions, thin_plate_inversion, vtem_max

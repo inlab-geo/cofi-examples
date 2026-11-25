@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# nbtest: run cofi-examples notebooks and check them against reference results.
+# See tools/nbtest/DESIGN.md. Uses the python3 of the current environment (local mode).
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ ! -d "$root/examples" || ! -f "$root/tools/nbtest/nbtest_entry.py" ]]; then
+    echo "nbtest: cannot find the cofi-examples repository root next to this script" >&2
+    exit 2
+fi
+
+exec python3 "$root/tools/nbtest/nbtest_entry.py" "$@"

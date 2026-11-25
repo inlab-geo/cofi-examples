@@ -1,0 +1,9 @@
+# nbtest smoke-test set: quick notebooks that together exercise the main cases.
+# Use with: ./nbtest run @smoke
+examples/linear_regression/linear_regression.ipynb                          # several methods incl. emcee
+examples/linear_regression/linear_regression_reduced_likelihood.ipynb       # deterministic, many figures
+examples/nonlinear_curve_fitting/nonlinear_curve_fitting.ipynb              # very fast, emcee
+examples/xray_tomography/xray_tomography.ipynb                              # no extra dependencies
+examples/fmm_tomography/fmm_tomography.ipynb                                # compiled solver from git (pyfm2d)
+examples/metaheuristic_optimiser_tests/slime_mould_algorithm_demo.ipynb     # nbformat 4.4, no cell ids
+examples/pygimli_ert/pygimli_ert.ipynb                                      # missing-package case without pygimli
