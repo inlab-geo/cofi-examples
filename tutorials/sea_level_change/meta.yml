@@ -1,0 +1,11 @@
+title: Curve fitting with CoFI
+application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Statistics -> Applied statistics -> Curve fitting
+description: Fitting polynomials and a trans-dimensional change-point model to synthetic data and to eustatic sea-level data, using a linear solver, an optimizer and Bayesian samplers
+method:
+  sea_level_change.ipynb:
+    description: "Polynomial regression solved by a linear system solver, an optimizer and emcee, then a trans-dimensional partition model of eustatic sea-level data sampled with BayesBay."
+    methods:
+      - CoFI -> Parameter estimation -> Matrix based solvers -> Linear system solvers -> scipy.linalg.lstsq -> gelsd
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> Nelder-Mead
+      - CoFI -> Ensemble methods -> Bayesian sampling -> McMC samplers -> emcee -> StretchMove
+      - CoFI -> Ensemble methods -> Bayesian sampling -> Trans-D McMC -> bayesbay -> VanillaSampler

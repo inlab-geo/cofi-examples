@@ -8,6 +8,20 @@ These are the notebooks illustrating the three use cases of CoFI:
 - **practitioner** — Explores surface wave tomography with CoFI, comparing different regularisation options and ensemble methods.
 - **developer** — Shows how developers can integrate new algorithms into CoFI, using receiver function analysis as an example.
 
+## Tutorial versions
+
+Curated Jupyter versions of these notebooks are available as tutorials in [`tutorials/`](../tutorials/). They do not need marimo and read their data from the shared top-level `data/` folder. Each tutorial folder also holds a marimo copy of the corresponding notebook, with only its data and figure paths adapted.
+
+| Use case | Tutorial | Marimo copy |
+|---|---|---|
+| educator | [Curve fitting with CoFI](../tutorials/sea_level_change/sea_level_change.ipynb) | [`sea_level_change.py`](../tutorials/sea_level_change/sea_level_change.py) |
+| practitioner | [Ambient noise tomography with CoFI](../tutorials/surface_wave_tomography/surface_wave_tomography.ipynb) | [`surface_wave_tomography.py`](../tutorials/surface_wave_tomography/surface_wave_tomography.py) |
+| developer | [Extending CoFI with a new inference tool](../tutorials/extending_cofi_new_solver/extending_cofi_new_solver.ipynb) | [`extending_cofi_new_solver.py`](../tutorials/extending_cofi_new_solver/extending_cofi_new_solver.py) |
+
+The Gaussian variational inference extension of the practitioner notebook lives in the tomography tutorial folder, as `surface_wave_tomography_variational_inference_extension` (`.ipynb` and `.py`).
+
+The notebooks in this folder remain the source for the paper. The tutorials are independent copies, so changes made here are not propagated to them automatically.
+
 ## Rendered notebooks
 
 ### Jupyter notebooks

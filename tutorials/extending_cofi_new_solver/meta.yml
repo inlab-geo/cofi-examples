@@ -1,0 +1,10 @@
+title: Extending CoFI with a new inference tool
+application domain: CoFI Examples -> MATHEMATICAL SCIENCES -> Applied mathematics -> Optimisation -> Metaheuristic optimisation
+description: Adding a new solver to CoFI by wrapping the Slime Mould Algorithm as an inference tool, validated on the multimodal Himmelblau function
+method:
+  extending_cofi_new_solver.ipynb:
+    description: "Implementing, registering, validating and testing a BaseInferenceTool subclass, and comparing it with scipy.optimize.minimize and Border Collie optimization on one unchanged problem definition."
+    methods:
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> BFGS
+      - CoFI -> Parameter estimation -> Optimization -> Non linear -> scipy.optimize.minimize -> L-BFGS-B
+      - CoFI -> Ensemble methods -> Direct search -> Monte Carlo -> cofi.border_collie_optimization -> Border Collie Optimization Algorithm
