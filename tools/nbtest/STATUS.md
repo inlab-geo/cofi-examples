@@ -139,9 +139,14 @@ changed.
 - Future `bless` must require staged provenance from image mode and the selected reference environment; local or
   provenance-free staged copies are refused.
 
-**Current blocker:** this worktree is on macOS 26.6.2 ARM64. Neither Apptainer/Singularity nor a `.sif` is
-available under the accessible CoFI paths, so the first gate and Fedora smoke run cannot be performed here. The
-next action requires the real `.sif` path and execution on the Fedora machine.
+**First gate passed on Ceres (2026-11-26).** Host: Rocky Linux 8.10 with Apptainer 1.5.4. Image:
+`/home/kitc/inlab-apptainer/inlab.sif`. Inside the image: Fedora 42 x86_64, Git 2.54.0, Python 3.13.13 and cofi
+`0.2.12+19.gc0f3596`. From `/home/kitc/cofi-examples-nbtest`, Git resolved the linked gitdir and common directory
+under `/home/kitc/cofi-examples/.git`; both were visible inside the image. The tracked vtem_max `.npy` probe
+passed. Apptainer's default home binding therefore preserves tracked side-effect detection for the Ceres layout.
+
+**Next implementation step:** explicit mode propagation and paired mode/environment provenance, followed by the
+Fedora image `@smoke` run.
 
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
