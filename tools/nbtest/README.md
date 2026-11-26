@@ -1,9 +1,9 @@
 # Using nbtest
 
 `nbtest` is the developing notebook runner and validation tool for this repository. The current implementation
-runs notebooks locally into disposable staged copies, protects those copies from accidental replacement, and
-records the latest run. Numerical and figure validation, reference blessing, publishing, image mode and full
-environment provenance are later slices and are not available yet.
+runs notebooks into disposable staged copies, protects those copies from accidental replacement, and records the
+latest run and its environment. Public image-mode selection, numerical and figure validation, reference blessing
+and publishing are later slices and are not available yet.
 
 The design and development record live in [`DESIGN.md`](DESIGN.md) and [`STATUS.md`](STATUS.md).
 
@@ -36,11 +36,13 @@ All generated files are ignored by Git:
 | --- | --- |
 | `examples/<folder>/<name>.nbtest.ipynb` | Executed copy to inspect in Jupyter. |
 | `tools/nbtest/state/state.json` | Machine-readable state: trusted staged hashes, supporting details, and the latest run. |
+| `tools/nbtest/state/environment.json` | Latest Python, system, package, Git, BLAS/threading and plotting provenance. |
 | `tools/nbtest/REPORT.md` | Human-readable summary of the latest run only. |
 
-`state.json` and `REPORT.md` are written atomically before execution, after every completed notebook, and when
-a run completes, is interrupted, or aborts unexpectedly. The latest run keeps the complete ordered plan, so an
-interruption shows the active notebook as `interrupted` and notebooks not reached as `not_run`.
+`environment.json`, `state.json` and `REPORT.md` are written atomically. State and report are refreshed before
+execution, after every completed notebook, and when a run completes, is interrupted, or aborts unexpectedly. The
+latest run keeps the complete ordered plan, so an interruption shows the active notebook as `interrupted` and
+notebooks not reached as `not_run`.
 
 Rebuild the report from saved state without running a notebook or importing notebook-execution packages:
 
@@ -48,8 +50,8 @@ Rebuild the report from saved state without running a notebook or importing note
 ./nbtest report
 ```
 
-The report includes targets, UTC dates, exit code, role, status, duration, concise failure details and files
-created, modified or deleted by each notebook. A change to a Git-tracked file is highlighted as a warning.
+The report includes mode, environment ID, targets, UTC dates, exit code, role, status, duration, failure details
+and files created, modified or deleted by each notebook. A change to a Git-tracked file is highlighted as a warning.
 Git-ignored files such as `__pycache__/`, the expected staged notebook, and completed atomic temporary files are
 not reported as notebook side effects. Side-effect detection is best effort: a zip checkout with no `.git`, or a
 worktree whose main repository is unavailable, still runs notebooks and reports that side-effect information is

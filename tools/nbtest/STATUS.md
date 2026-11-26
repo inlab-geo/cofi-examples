@@ -175,6 +175,21 @@ image hashing, validation, blessing and publishing.
 4. Direct Ceres image run records `image`, the Fedora fingerprint and matching staged provenance; Git side-effect
    information remains available.
 
+**Implementation status (2026-11-26): code written, uncommitted pending review**
+
+- Added deterministic environment collection and atomic `state/environment.json`: Python, OS/kernel/architecture,
+  installed distributions, cofi/repository Git provenance, deterministic thread settings, NumPy BLAS/LAPACK
+  build details, threadpoolctl data where available, and matplotlib/FreeType details.
+- Machine-specific paths are retained for diagnosis but excluded from the ID. Package and mode changes alter the
+  ID. Raw installation URLs are not retained.
+- `begin_run` receives mode/environment ID; written staged notebooks carry the same values in state and metadata.
+  No-write simulation preserved the older hash/mode/environment quartet and unknown future fields.
+- Local macOS ARM64 acceptance: repeated collection produced a stable ID and byte-identical document; a real
+  notebook run had matching IDs in all four locations, matching staged hash, local Accelerate BLAS/LAPACK data,
+  and a byte-reproducible report under `python -S`.
+- Remaining gate: review and approval to commit/push the code, then direct Ceres image execution using the private
+  `NBTEST_MODE=image`/`NBTEST_IMAGE_PATH` interface.
+
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
 The first self-contained piece of step 1. Local mode only.
