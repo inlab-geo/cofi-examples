@@ -95,12 +95,22 @@ validation, references, blessing or publishing.
   unknown future field; removing `git` from `PATH` still ran the notebook and reported side effects unavailable;
   rapid double Ctrl-C exited 130 without a traceback and retained `interrupted` plus remaining `not_run` state.
 - The local `cofidev` environment currently fails the nonlinear and linear regression examples at ArviZ's
-  missing `plot_trace_dist`; nbtest records these as notebook failures as intended.
+  missing `plot_trace_dist`; its installed `pygimli` also fails on the internal module `pgcore`. nbtest records
+  these as notebook failures as intended.
+- Full non-Fedora smoke run (macOS 26.6.2 ARM64, `cofidev` Python 3.12.12, 2026-11-26): `./nbtest run @smoke`
+  completed seven notebooks in 41.4 s — four `ok` (reduced-likelihood regression, X-ray tomography, FMM
+  tomography and slime-mould) and the three environment failures above. All seven staged hashes matched state;
+  no side effects or unavailable side-effect checks were recorded; Git status and the tracked diff were unchanged.
+- Independent local environment run (same macOS ARM64 host, `cofCon` Python 3.10.18, cofi 0.2.10, nbclient
+  0.10.2, NumPy 1.26.0, SciPy 1.15.2, Matplotlib 3.10.6, ArviZ 0.22.0): X-ray tomography was `ok` in 11.3 s
+  with four figures and 19 outputs. Kernel/interpreter identity and the staged hash matched, no side effects were
+  reported, Git status was unchanged, and `report` reproduced byte for byte. A separate Python 3.11 environment
+  was rejected with exit 2 before execution because its standard library was broken; it changed no workspace
+  state. Process start-time inspection confirmed the acceptance runs left no new kernels.
 
 **Next gate:** maintainer review of the uncommitted code diff and acceptance evidence, followed by code commit
-and push only if approved. Full `@smoke`, forced timeout and an integrated notebook-created side-effect run can
-be repeated before approval if the maintainer wants the complete acceptance matrix rather than the focused
-checks above.
+and push only if approved. A forced timeout and an integrated notebook-created side-effect run remain if the
+maintainer wants the complete acceptance matrix rather than the focused checks above.
 
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
