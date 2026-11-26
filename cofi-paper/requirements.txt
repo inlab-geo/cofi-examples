@@ -6,7 +6,12 @@ scipy
 h5py
 arviz
 bayesbay
-cofi>=0.2.12
+# cofi.gaussian_vi ("variational inference", used by practitioner_vi.py) is not
+# in a release yet — it lives on the gaussian-vi branch. Switch back to a
+# released `cofi>=0.2.13` once that branch is merged and published.
+cofi @ git+https://github.com/inlab-geo/cofi@gaussian-vi
+# CHOLMOD bindings for cofi.gaussian_vi — cofi does not declare this itself
+scikit-sparse>=0.5
 seislib
 cartopy
 cmcrameri
