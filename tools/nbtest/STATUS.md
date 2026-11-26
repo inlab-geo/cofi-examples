@@ -4,9 +4,9 @@ Last updated: 2026-11-26. Update this file whenever work is done or a decision i
 
 ## Current state
 
-- Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) done: committed as `b063399` and pushed to
-  `origin/nbtest` on 2026-11-25. Slice 2A (state and local report) approved on 2026-11-26; implementation is
-  next.** Environment fingerprinting and modes remain slice 2B.
+- Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) is committed as `b063399` and pushed to
+  `origin/nbtest`. Slice 2A (state and local report) is implemented and manually verified; its code is deliberately
+  uncommitted pending maintainer review.** Environment fingerprinting and modes remain slice 2B.
 - Branch `nbtest`, created from `origin/main` at `d81ceb7`; pushed to `origin/nbtest` (tracking set). The maintainer's checkout lives in a
   separate git worktree on another branch and must not be switched.
 - Nothing existing has been deleted or changed; old tools stay until the final cleanup step.
@@ -71,6 +71,29 @@ validation, references, blessing or publishing.
 3. Code written but not committed.
 4. Acceptance output and before/after status shown to the maintainer.
 5. Maintainer reviews the diff; only then may code be committed and pushed.
+
+**Implementation and verification (2026-11-26)**
+
+- Added versioned atomic state, latest-run reporting, `run --force`, staged SHA-256 preflight, side-effect
+  detection and the dependency-free `report` command. User instructions and generated-file locations are in
+  `README.md`.
+- An existing Slice 1 staged notebook was refused without state. `--force` adopted it; a later manual edit was
+  refused, and a second `--force` restored a matching saved/file hash.
+- A failing notebook was recorded with its cell and error; `./nbtest report` reproduced `REPORT.md` byte for
+  byte. `python -S ... report` also succeeded, confirming report generation does not import execution packages.
+- Ctrl-C produced exit 130 with `interrupted` for the active notebook and `not_run` for two notebooks not
+  reached. A later targeted run preserved another notebook's trusted hash.
+- Ephemeral Git-repository checks covered created, modified and deleted side effects, the tracked-file warning,
+  staged-file exclusion, and omission of ignored `__pycache__/`. Corrupt JSON and schema version 99 were safely
+  refused. Removing `git` from `PATH` produced an `aborted` run with exit 2 and no saved traceback. Syntax
+  parsing and `git diff --check` pass.
+- The local `cofidev` environment currently fails the nonlinear and linear regression examples at ArviZ's
+  missing `plot_trace_dist`; nbtest records these as notebook failures as intended.
+
+**Next gate:** maintainer review of the uncommitted code diff and acceptance evidence, followed by code commit
+and push only if approved. Full `@smoke`, forced timeout and an integrated notebook-created side-effect run can
+be repeated before approval if the maintainer wants the complete acceptance matrix rather than the focused
+checks above.
 
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
