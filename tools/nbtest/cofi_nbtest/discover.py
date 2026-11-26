@@ -22,6 +22,11 @@ def is_notebook_name(name: str) -> bool:
     return name.endswith(".ipynb") and not name.endswith(STAGED_SUFFIX) and not name.startswith(".")
 
 
+def staged_path(original: Path) -> Path:
+    """Return the disposable output path for an original notebook."""
+    return original.with_name(original.name[: -len(".ipynb")] + STAGED_SUFFIX)
+
+
 def _example_folders(root: Path) -> Iterable[Path]:
     for top in SCOPES:
         base = root / top

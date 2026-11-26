@@ -21,3 +21,5 @@ data/century_dcip/transform-2020-simpeg
 
 # nbtest staged notebooks (tools/nbtest)
 *.nbtest.ipynb
+tools/nbtest/state/
+tools/nbtest/REPORT.md

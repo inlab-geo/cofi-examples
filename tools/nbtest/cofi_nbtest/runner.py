@@ -27,8 +27,8 @@ from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError, DeadKernelError
 
 from cofi_nbtest import __version__
-from cofi_nbtest.discover import STAGED_SUFFIX
-from cofi_nbtest.fileio import atomic_write_text
+from cofi_nbtest.discover import staged_path
+from cofi_nbtest.fileio import AtomicWriteConflict, atomic_write_text
 from cofi_nbtest.kernel import own_python
 from cofi_nbtest.outcome import classify_error, load_optional_packages
 
@@ -49,16 +49,15 @@ class Result:
     staged: Path
     status: str  # ok | failed | timeout | skipped
     duration_s: float
+    original_sha256: str
+    staged_written: bool = False
+    staged_sha256: Optional[str] = None
     cell: Optional[int] = None  # 1-based position of the failing cell in the notebook
     ename: Optional[str] = None
     evalue: Optional[str] = None
     missing: Optional[str] = None
     kernel_python: Dict[str, str] = field(default_factory=dict)
     kernel_log: Optional[str] = None  # tail of the kernel process's own output, only if it died
-
-
-def staged_path(original: Path) -> Path:
-    return original.with_name(original.name[: -len(".ipynb")] + STAGED_SUFFIX)
 
 
 def _sha256(data: bytes) -> str:
@@ -161,7 +160,13 @@ class _Worker(threading.Thread):
                 pass  # loop already closed
 
 
-def run_notebook(original: Path, root: Path, kernel_name: str, timeout_s: int) -> Result:
+def run_notebook(
+    original: Path,
+    root: Path,
+    kernel_name: str,
+    timeout_s: int,
+    expected_staged_sha256: Optional[str],
+) -> Result:
     """Execute original and write its staged copy. Raises Interrupted on Ctrl-C."""
     original_bytes = original.read_bytes()
     nb = nbformat.reads(original_bytes.decode("utf-8"), as_version=4)
@@ -180,7 +185,17 @@ def run_notebook(original: Path, root: Path, kernel_name: str, timeout_s: int) -
     )
     progress = _Progress()
     with tempfile.TemporaryFile() as kernel_log:
-        return _run(client, nb, progress, kernel_log, original, root, original_bytes, timeout_s)
+        return _run(
+            client,
+            nb,
+            progress,
+            kernel_log,
+            original,
+            root,
+            original_bytes,
+            timeout_s,
+            expected_staged_sha256,
+        )
 
 
 # Known harmless line ipykernel 7.3 prints for every local kernel; not worth showing.
@@ -249,6 +264,7 @@ def _run(
     root: Path,
     original_bytes: bytes,
     timeout_s: int,
+    expected_staged_sha256: Optional[str],
 ) -> Result:
     worker = _Worker(client, progress, kernel_log)
     started = datetime.now(timezone.utc)
@@ -275,7 +291,14 @@ def _run(
 
     duration = time.monotonic() - t0
     staged = staged_path(original)
-    result = Result(path=original, staged=staged, status="ok", duration_s=duration, kernel_python=progress.kernel_python)
+    result = Result(
+        path=original,
+        staged=staged,
+        status="ok",
+        duration_s=duration,
+        original_sha256=_sha256(original_bytes),
+        kernel_python=progress.kernel_python,
+    )
     cell_number = progress.cell_index + 1 if progress.cell_index is not None else None
     error = worker.error
 
@@ -316,11 +339,18 @@ def _run(
         result.ename = type(error).__name__
         result.evalue = str(error)
 
-    _write_staged(nb, result, root, original_bytes, started)
+    _write_staged(nb, result, root, original_bytes, started, expected_staged_sha256)
     return result
 
 
-def _write_staged(nb: Any, result: Result, root: Path, original_bytes: bytes, started: datetime) -> None:
+def _write_staged(
+    nb: Any,
+    result: Result,
+    root: Path,
+    original_bytes: bytes,
+    started: datetime,
+    expected_staged_sha256: Optional[str],
+) -> None:
     stamp = {
         "nbtest_version": __version__,
         "status": result.status,
@@ -345,4 +375,19 @@ def _write_staged(nb: Any, result: Result, root: Path, original_bytes: bytes, st
     nb.metadata["nbtest"] = stamp
     # The hash of the staged file as written is recorded outside the file (state.json, slice 2).
     # The staged copy gets the same permissions as its original notebook.
-    atomic_write_text(result.staged, nbformat.writes(nb) + "\n", mode=stat.S_IMODE(result.path.stat().st_mode))
+    try:
+        result.staged_sha256 = atomic_write_text(
+            result.staged,
+            nbformat.writes(nb) + "\n",
+            mode=stat.S_IMODE(result.path.stat().st_mode),
+            expected_sha256=expected_staged_sha256,
+        )
+    except AtomicWriteConflict:
+        result.status = "failed"
+        result.cell = None
+        result.ename = "StagedConflict"
+        result.evalue = "staged notebook changed while this run was executing; it was left unchanged"
+        result.missing = None
+        result.kernel_log = None
+        return
+    result.staged_written = True
