@@ -66,8 +66,11 @@ $ ./nbtest publish examples/fmm_tomography
   folder a user gets when opening the staged copy in Jupyter.
 - `run` records the hash of the original in the staged notebook's `metadata.nbtest` and (from slice 2) the hash
   of the staged file as written in `state.json` — not inside the staged file, which cannot contain its own hash.
-  If the staged copy was edited since, `run` refuses to overwrite it (`--force` overrides). If the original
-  changed since, `publish` refuses.
+  If the staged copy was edited since, `run` refuses to overwrite it (`--force` overrides). Its hash is checked
+  again immediately before atomic replacement, so an edit made while an earlier notebook is running is also
+  preserved and reported as a conflict. Trusted original/staged provenance changes only when a staged copy was
+  actually written. If the original changed since, `publish` refuses and also verifies the original hash stored
+  inside the staged notebook.
 - Before running, all code-cell outputs are cleared, so cells after a failure never keep the original's
   committed outputs. The staged copy gets the same file permissions as its original.
 
@@ -192,7 +195,8 @@ over the original), `./nbtest validate --run <nb>`.
 - **In place:** notebooks execute in their own folder, as when the staged copy is opened in Jupyter. The folder is
   snapshotted before and after; files a run created or modified are reported, with a warning when a tracked file
   changed (e.g. vtem_max's `three_survey_lines_lhs.npy`, which differs on every run unless seeded).
-  See `STATUS.md` for the vtem_max file chain.
+  Side-effect reporting is best effort: without readable Git metadata the notebook still runs and its report says
+  side effects are unavailable. See `STATUS.md` for the vtem_max file chain.
 - **Timeouts:** nbclient's `timeout` applies **per cell**, not per notebook. nbtest sets a per-cell timeout and
   also enforces a wall-clock timeout per notebook with its own watchdog; default **3 hours** per notebook
   (`--timeout`). After a timeout or Ctrl-C the kernel is shut down (killed if it does not stop within 60 s);
@@ -269,5 +273,7 @@ testing them); per-notebook tolerances, statistical sampler checks, named `recor
 | Not adopted (2026-11-25): `env --requirements` for Bob; `bless` refusing a different image sha256 | Considered in review; the user did not take them up. Do not re-add without asking. |
 | Slice 2A state is a cumulative notebook registry plus one latest-run record; `REPORT.md` shows only the latest run (2026-11-26) | Trusted staged hashes must survive targeted runs, while the report should not present old notebooks as part of the current command. Role and status live only in the ordered latest-run list; side effects also live only with that run. |
 | A staged notebook without a recorded hash, or whose hash changed, is refused unless `run --force` is explicit (2026-11-26) | Slice 1 staged files and user-edited staged files cannot safely be distinguished without state. The refusal explains the one-time upgrade friction. |
-| Slice 2A uses minimal state checks and no lock: parse JSON, check schema version and core containers; concurrent runs are unsupported and last writer wins (2026-11-26) | State is disposable local data. Atomic writes prevent corruption, and a later hash mismatch fails safely with `--force` instructions. |
-| Run side effects retain only path, created/modified/deleted kind and Git-tracked flag; ignored untracked files are omitted (2026-11-26) | Detection hashes are temporary implementation data, and omitting ignored files prevents `__pycache__/` noise. |
+| Slice 2A uses minimal state checks and no lock: parse JSON, check schema version and core containers; concurrent runs are unsupported and last writer wins (2026-11-26) | State protects staged edits and must be preserved. Atomic writes prevent corruption, and a later hash mismatch fails safely with instructions to inspect the staged copy before considering `--force`. |
+| Run side effects retain only path, created/modified/deleted kind and Git-tracked flag; ignored untracked files are omitted; detection is best effort (2026-11-26) | Detection hashes are temporary implementation data, omitting ignored files prevents `__pycache__/` noise, and a zip checkout or inaccessible worktree metadata must not prevent notebook execution. |
+| Slice 2A review hardening: re-check staged hashes at atomic replacement, update trusted provenance only after a write, preserve unknown record fields, ignore repeat Ctrl-C during cleanup (2026-11-26) | Prevents mid-run edits and stale original/staged pairs from becoming trusted, keeps additive future state compatible, and preserves accurate interrupted state. |
+| State-format evolution: additive fields keep schema 1; breaking versions ship a migration and never instruct users to delete state (2026-11-26) | State is the only evidence distinguishing generated staged copies from unpublished edits. Deleting it turns safe recovery into a destructive `--force` guess. |

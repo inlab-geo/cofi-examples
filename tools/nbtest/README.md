@@ -51,24 +51,32 @@ Rebuild the report from saved state without running a notebook or importing note
 The report includes targets, UTC dates, exit code, role, status, duration, concise failure details and files
 created, modified or deleted by each notebook. A change to a Git-tracked file is highlighted as a warning.
 Git-ignored files such as `__pycache__/`, the expected staged notebook, and completed atomic temporary files are
-not reported as notebook side effects.
+not reported as notebook side effects. Side-effect detection is best effort: a zip checkout with no `.git`, or a
+worktree whose main repository is unavailable, still runs notebooks and reports that side-effect information is
+unavailable.
 
 ## Protecting staged work
 
-Before starting a kernel, `run` checks every selected staged notebook against its saved SHA-256. It refuses to
-replace a staged file that has been manually edited or was created before state tracking. Review or copy out any
-work you need, then explicitly replace it with:
+Before starting a kernel, `run` checks every selected staged notebook against its saved SHA-256. It checks the
+same hash again immediately before atomic replacement, so an edit made while the command is running is left
+unchanged and reported as `StagedConflict`. It also refuses a staged file that was created before state tracking.
+Review or copy out any work you need, then explicitly replace it with:
 
 ```console
 ./nbtest run --force <targets>
 ```
 
-`--force` is reported in the terminal but is not saved as state. It does not suppress notebook failures.
+`--force` permanently replaces the listed staged files. It is reported in the terminal but is not saved as
+state, and it does not suppress notebook failures.
 
-If `state.json` is corrupt or uses an unsupported schema, execution stops before a kernel starts. The recovery
-path is to remove `tools/nbtest/state/` and rerun with `--force` if staged notebooks already exist. Two concurrent
-`nbtest run` processes are unsupported: atomic writes prevent partial files, but the last state writer wins and
-the next hash preflight safely rejects any mismatch.
+If `state.json` is corrupt or uses an unsupported schema, execution stops before a kernel starts. Preserve both
+state and staged notebooks: restore the state file from a backup or use the compatible/newer nbtest version.
+Do not delete state and blindly use `--force`, because state is what distinguishes generated output from
+unpublished edits. Two concurrent `nbtest run` processes are unsupported: atomic writes prevent partial files,
+but the last state writer wins and the next hash preflight safely rejects any mismatch.
+
+State schema 1 allows additive fields without a version bump, and rerunning a notebook preserves fields it does
+not own. A future incompatible schema change must include a migration; deleting state is not an upgrade path.
 
 ## Exit codes
 

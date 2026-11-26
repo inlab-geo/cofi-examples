@@ -41,16 +41,19 @@ validation, references, blessing or publishing.
   original/staged hashes live in the cumulative notebook record; status is not duplicated there.
 - Side effects belong only to the latest run and retain repository-relative path, change kind and Git-tracked
   flag. Hashes are used only during detection. Ignored untracked files, the expected staged copy and atomic
-  temporary files are omitted.
+  temporary files are omitted. Detection is best effort: missing or inaccessible Git metadata records
+  `side effects unavailable` but does not prevent execution.
 - `run` preflights every selected staged copy before starting a kernel. A staged copy with no state hash
   (including Slice 1 output) or a changed hash is refused with a one-time upgrade explanation; `--force`
-  permits replacement. Forced replacement is printed but not persisted.
+  permits replacement. The expected hash is checked again immediately before atomic replacement; a mid-run edit
+  is left unchanged and recorded as `StagedConflict`. Forced replacement is printed but not persisted.
 - `report` reads state and atomically rebuilds `REPORT.md` without importing execution dependencies. The report
   shows only the latest command. Interrupted and aborted runs retain the complete plan, with unreached entries
   shown as `not_run`.
 - State loading parses JSON, checks schema version 1 and the core object containers. Corrupt or unsupported
-  state stops before execution with instructions to remove `state/` and rerun with `--force` if staged files
-  may be replaced.
+  state stops before execution and tells the user to preserve state and staged notebooks. Additive fields do not
+  bump the version and unknown notebook-record fields survive a rerun; a future breaking version must ship a
+  migration rather than instruct users to delete state.
 - Concurrent runs are unsupported and no lock is added. Atomic files prevent corruption; last writer wins and
   any staged/state mismatch is refused on the next run.
 - A `try/finally` marks an unfinished run `aborted`; no internal exception diagnostics are stored in state.
@@ -58,7 +61,8 @@ validation, references, blessing or publishing.
 **Acceptance groups (manual; no test framework)**
 
 1. Normal fast run writes matching hashes and a report that `./nbtest report` reproduces byte-for-byte.
-2. A Slice 1 staged file and then a manually edited trusted file are refused; `--force` replaces each.
+2. A Slice 1 staged file and then a manually edited trusted file are refused; `--force` replaces each. An edit
+   made during execution is preserved as `StagedConflict`.
 3. A targeted rerun preserves other trusted hashes; Ctrl-C records `interrupted` plus remaining `not_run`.
 4. Nonignored side effects are listed, tracked changes warn, and ignored `__pycache__/` is absent.
 5. Failure, timeout, corrupt state and unsupported state produce the agreed state/report or safe refusal.
@@ -85,8 +89,10 @@ validation, references, blessing or publishing.
   reached. A later targeted run preserved another notebook's trusted hash.
 - Ephemeral Git-repository checks covered created, modified and deleted side effects, the tracked-file warning,
   staged-file exclusion, and omission of ignored `__pycache__/`. Corrupt JSON and schema version 99 were safely
-  refused. Removing `git` from `PATH` produced an `aborted` run with exit 2 and no saved traceback. Syntax
-  parsing and `git diff --check` pass.
+  refused. Syntax parsing and `git diff --check` pass.
+- Review hardening checks: a mid-run edit survived and returned `StagedConflict`; the conditional atomic writer's
+  returned digest matched the file; a no-write result preserved the older original/staged provenance pair and an
+  unknown future field; removing `git` from `PATH` still ran the notebook and reported side effects unavailable.
 - The local `cofidev` environment currently fails the nonlinear and linear regression examples at ArviZ's
   missing `plot_trace_dist`; nbtest records these as notebook failures as intended.
 
