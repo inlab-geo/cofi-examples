@@ -4,9 +4,9 @@ Last updated: 2026-11-26. Update this file whenever work is done or a decision i
 
 ## Current state
 
-- Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) is committed as `b063399` and pushed to
-  `origin/nbtest`. Slice 2A (state and local report) is implemented and manually verified; its code is deliberately
-  uncommitted pending maintainer review.** Environment fingerprinting and modes remain slice 2B.
+- Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) is committed as `b063399`. Slice 2A (state and local
+  report) is committed as `c8034e1`; all Slice 2A documentation and code are pushed to `origin/nbtest`. Slice 2B
+  environment/mode work has started with the required real-image preflight below.**
 - Branch `nbtest`, created from `origin/main` at `d81ceb7`; pushed to `origin/nbtest` (tracking set). The maintainer's checkout lives in a
   separate git worktree on another branch and must not be switched.
 - Nothing existing has been deleted or changed; old tools stay until the final cleanup step.
@@ -108,9 +108,40 @@ validation, references, blessing or publishing.
   was rejected with exit 2 before execution because its standard library was broken; it changed no workspace
   state. Process start-time inspection confirmed the acceptance runs left no new kernels.
 
-**Next gate:** maintainer review of the uncommitted code diff and acceptance evidence, followed by code commit
-and push only if approved. A forced timeout and an integrated notebook-created side-effect run remain if the
-maintainer wants the complete acceptance matrix rather than the focused checks above.
+**Slice 2A is complete and pushed.** A forced timeout and an integrated notebook-created side-effect run remain
+optional extensions to its acceptance matrix; they do not block Slice 2B.
+
+## Slice 2B: mode and environment provenance (STARTED 2026-11-26)
+
+No 2B code is written yet. Environment behavior must be measured before the wrapper and state interfaces are
+changed.
+
+**Required Fedora/image preflight — first gate**
+
+1. On the Fedora maintainer machine, use the real reference `.sif`; do not substitute a built or downloaded
+   image. Record Fedora, Apptainer and image paths/versions.
+2. Inside that image, verify `command -v git` succeeds.
+3. From inside the image, run `git -C <worktree> rev-parse --git-dir`, `--git-common-dir` and `ls-files`. Verify
+   both resolved Git directories are visible. A worktree's `.git` is a pointer into the main checkout, and binding
+   only the worktree can otherwise make tracked side-effect warnings silently unavailable.
+4. If either Git check fails, stop before implementing image execution. Decide the minimum bind set and make
+   image-mode startup fail clearly or make `bless` refuse a run whose side effects were unavailable; do not accept
+   silent loss of the vtem_max tracked `.npy` warning.
+5. After mode provenance is implemented, rerun `./nbtest run @smoke` on Fedora in the reference image and retain
+   the raw outcomes, side-effect availability, hashes and Git before/after status.
+
+**State rule for 2B**
+
+- `begin_run` must receive the selected mode instead of hard-coding `local`.
+- The notebook record gains `mode` and `environment_id` only when `staged_written` is true, alongside the paired
+  original/staged hashes. A failed, interrupted or conflicted no-write attempt must preserve all four provenance
+  values from the older staged copy.
+- Future `bless` must require staged provenance from image mode and the selected reference environment; local or
+  provenance-free staged copies are refused.
+
+**Current blocker:** this worktree is on macOS 26.6.2 ARM64. Neither Apptainer/Singularity nor a `.sif` is
+available under the accessible CoFI paths, so the first gate and Fedora smoke run cannot be performed here. The
+next action requires the real `.sif` path and execution on the Fedora machine.
 
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
