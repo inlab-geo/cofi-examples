@@ -148,6 +148,33 @@ passed. Apptainer's default home binding therefore preserves tracked side-effect
 **Next implementation step:** explicit mode propagation and paired mode/environment provenance, followed by the
 Fedora image `@smoke` run.
 
+### Slice 2B.1: runtime context and provenance
+
+**In scope**
+
+- One runtime context per command: mode (`local` by default, `image` only when explicitly supplied), optional
+  image path, complete environment document and stable short environment ID.
+- Atomically write the latest document to `tools/nbtest/state/environment.json`. It records Python, OS/kernel/
+  architecture, installed distributions, cofi and cofi-examples Git provenance where available, threading/BLAS
+  details and matplotlib/FreeType details. Machine-specific paths are recorded but excluded from the stable ID.
+- `begin_run` receives mode and environment ID; neither is hard-coded in state.
+- A successfully written staged copy records `mode` and `environment_id` with its paired original/staged hashes
+  in both state and notebook metadata. A no-write attempt preserves the older provenance quartet.
+- `REPORT.md` shows the latest environment ID. `report` remains runnable without notebook-execution packages.
+- Until the wrapper slice, `NBTEST_MODE=image` and `NBTEST_IMAGE_PATH=<sif>` are the private execution interface
+  used only for the Ceres acceptance run; ordinary commands remain local by default.
+
+**Out of scope for 2B.1:** remembered `.local.json`, public `mode`/`env` commands, Apptainer re-exec in the wrapper,
+image hashing, validation, blessing and publishing.
+
+**Acceptance**
+
+1. Local run writes a reproducible environment document and matching IDs in latest-run and written-notebook state.
+2. A simulated no-write result preserves older mode/environment/hash provenance and unknown future fields.
+3. `report` regenerates byte for byte with site packages disabled.
+4. Direct Ceres image run records `image`, the Fedora fingerprint and matching staged provenance; Git side-effect
+   information remains available.
+
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
 The first self-contained piece of step 1. Local mode only.
