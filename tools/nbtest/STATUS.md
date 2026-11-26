@@ -92,7 +92,8 @@ validation, references, blessing or publishing.
   refused. Syntax parsing and `git diff --check` pass.
 - Review hardening checks: a mid-run edit survived and returned `StagedConflict`; the conditional atomic writer's
   returned digest matched the file; a no-write result preserved the older original/staged provenance pair and an
-  unknown future field; removing `git` from `PATH` still ran the notebook and reported side effects unavailable.
+  unknown future field; removing `git` from `PATH` still ran the notebook and reported side effects unavailable;
+  rapid double Ctrl-C exited 130 without a traceback and retained `interrupted` plus remaining `not_run` state.
 - The local `cofidev` environment currently fails the nonlinear and linear regression examples at ArviZ's
   missing `plot_trace_dist`; nbtest records these as notebook failures as intended.
 
