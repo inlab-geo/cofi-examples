@@ -1,14 +1,14 @@
 # nbtest status
 
-Last updated: 2026-11-25. Update this file whenever work is done or a decision is made.
+Last updated: 2026-11-26. Update this file whenever work is done or a decision is made.
 
 ## Current state
 
 - Design agreed (`DESIGN.md`). **Slice 1 (`run`, local mode) done: committed as `b063399` and pushed to
-  `origin/nbtest` on 2026-11-25.** Next: plan slice 2 with the maintainer (state.json/REPORT.md, environment.json,
-  modes; see Plan step 1).
+  `origin/nbtest` on 2026-11-25. Slice 2A (state and local report) approved on 2026-11-26; implementation is
+  next.** Environment fingerprinting and modes remain slice 2B.
 - Branch `nbtest`, created from `origin/main` at `d81ceb7`; pushed to `origin/nbtest` (tracking set). The maintainer's checkout lives in a
-  separate git worktree: `../cofi-examples` is on another branch (`gaussian-vi`) and must not be switched.
+  separate git worktree on another branch and must not be switched.
 - Nothing existing has been deleted or changed; old tools stay until the final cleanup step.
 
 ## Plan
@@ -26,6 +26,51 @@ Last updated: 2026-11-25. Update this file whenever work is done or a decision i
    `.github/workflows/test_all_notebooks.yml`; rewrite `tools/README.md`. Keep `tools/validation/`.
    Afterwards `inlab-containers/docs/how-it-works.md` needs updating — it names `run_notebooks.py all` as the
    image's integration test.
+
+## Slice 2A: persistent state and local report (APPROVED 2026-11-26)
+
+The smallest remaining local-mode foundation. It does not add environment fingerprints, image mode,
+validation, references, blessing or publishing.
+
+**In scope**
+
+- `tools/nbtest/state/state.json` is local, versioned state written atomically. It contains a cumulative map of
+  trusted staged notebooks and one latest-run record. `tools/nbtest/REPORT.md` is generated from that state.
+- The latest run has one ordered notebook list containing only path, role (`target` or `prerequisite`) and
+  status (`not_run`, `ok`, `failed`, `timeout`, `skipped` or `interrupted`). Supporting details and trusted
+  original/staged hashes live in the cumulative notebook record; status is not duplicated there.
+- Side effects belong only to the latest run and retain repository-relative path, change kind and Git-tracked
+  flag. Hashes are used only during detection. Ignored untracked files, the expected staged copy and atomic
+  temporary files are omitted.
+- `run` preflights every selected staged copy before starting a kernel. A staged copy with no state hash
+  (including Slice 1 output) or a changed hash is refused with a one-time upgrade explanation; `--force`
+  permits replacement. Forced replacement is printed but not persisted.
+- `report` reads state and atomically rebuilds `REPORT.md` without importing execution dependencies. The report
+  shows only the latest command. Interrupted and aborted runs retain the complete plan, with unreached entries
+  shown as `not_run`.
+- State loading parses JSON, checks schema version 1 and the core object containers. Corrupt or unsupported
+  state stops before execution with instructions to remove `state/` and rerun with `--force` if staged files
+  may be replaced.
+- Concurrent runs are unsupported and no lock is added. Atomic files prevent corruption; last writer wins and
+  any staged/state mismatch is refused on the next run.
+- A `try/finally` marks an unfinished run `aborted`; no internal exception diagnostics are stored in state.
+
+**Acceptance groups (manual; no test framework)**
+
+1. Normal fast run writes matching hashes and a report that `./nbtest report` reproduces byte-for-byte.
+2. A Slice 1 staged file and then a manually edited trusted file are refused; `--force` replaces each.
+3. A targeted rerun preserves other trusted hashes; Ctrl-C records `interrupted` plus remaining `not_run`.
+4. Nonignored side effects are listed, tracked changes warn, and ignored `__pycache__/` is absent.
+5. Failure, timeout, corrupt state and unsupported state produce the agreed state/report or safe refusal.
+6. `@smoke` retains Slice 1 outcomes and produces no unexpected tracked changes.
+
+**Gates**
+
+1. Specification approved. (done 2026-11-26)
+2. Documentation committed before code.
+3. Code written but not committed.
+4. Acceptance output and before/after status shown to the maintainer.
+5. Maintainer reviews the diff; only then may code be committed and pushed.
 
 ## Slice 1: `run` creates staged notebooks (DONE 2026-11-25, commit `b063399`)
 
@@ -144,14 +189,13 @@ Later, image mode only: the vtem_max pair `three_survey_lines_latin_hypercube_sa
 
 Facts (checked 2026-11-25, only `examples/vtem_max/` has a `dependencies.txt`):
 
-- `dependencies.txt` lists `three_survey_lines_latin_hypercube_sampling.ipynb` then
-  `three_survey_lines_surrogate_model_creation.ipynb`. The old runner runs listed notebooks first, then the rest
-  in `os.listdir` order (arbitrary).
+- `dependencies.txt` lists `three_survey_lines_latin_hypercube_sampling.ipynb`,
+  `three_survey_lines_surrogate_model_creation.ipynb`, then `caber_preprocessing.ipynb`. The old runner runs
+  listed notebooks first, then the rest in `os.listdir` order (arbitrary).
 - Chain: latin_hypercube_sampling writes `three_survey_lines_lhs.npy` (**tracked in git**) →
   surrogate_model_creation reads it and writes `kriging_surrogate_model.pkl` (untracked, generated) →
   `three_survey_lines_smt_bayesbay`, `_smt_emcee`, `_smt_neighpy` read the `.pkl`.
-- Not listed: `caber_preprocessing.ipynb` writes `caber_survey.npy` (**tracked**), which `caber_inversion.ipynb`
-  reads. It works today only because the `.npy` is committed.
+- `caber_preprocessing.ipynb` writes `caber_survey.npy` (**tracked**), which `caber_inversion.ipynb` reads.
 
 Agreed handling (also in `DESIGN.md`):
 
@@ -163,8 +207,7 @@ Agreed handling (also in `DESIGN.md`):
 3. Execute in place (consistent with editing the staged copy in Jupyter). Snapshot the folder before and after;
    report created/modified files and warn when a tracked file was modified (e.g. the LHS `.npy`, which is random
    unless seeded).
-4. Add `caber_preprocessing.ipynb` to `examples/vtem_max/dependencies.txt` (a one-line data change; to do as
-   part of step 1, not done yet).
+4. `caber_preprocessing.ipynb` was added to `examples/vtem_max/dependencies.txt` in slice 1.
 
 ## Environment notes
 

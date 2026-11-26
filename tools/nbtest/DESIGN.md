@@ -3,7 +3,8 @@
 nbtest is a local, terminal-driven tool that runs the cofi-examples notebooks and checks whether they still
 reproduce their reference numbers and figures. It replaces `tools/run_notebooks/`.
 
-Status: design agreed 2026-11-25, nothing implemented yet. See `STATUS.md` for progress and open items.
+Status: design agreed 2026-11-25; slice 1 is implemented and slice 2A is approved. See `STATUS.md` for progress
+and open items.
 A shared copy of this design (with a data-flow diagram) is at
 https://claude.ai/artifact/MPVJxUG6bSMCocTL1Yy6CN — this file is the source of truth if they differ.
 
@@ -266,3 +267,7 @@ testing them); per-notebook tolerances, statistical sampler checks, named `recor
 | Staged-file hash kept in `state.json` (slice 2), not inside the staged notebook (2026-11-25) | A file cannot contain its own hash; a blanked-field hash breaks when nbformat changes. |
 | `dependencies.txt` stays a flat per-folder list, even though single vtem_max targets then also run `caber_preprocessing` (2026-11-25) | Simplicity over precision; costs run time only for single-notebook targets. |
 | Not adopted (2026-11-25): `env --requirements` for Bob; `bless` refusing a different image sha256 | Considered in review; the user did not take them up. Do not re-add without asking. |
+| Slice 2A state is a cumulative notebook registry plus one latest-run record; `REPORT.md` shows only the latest run (2026-11-26) | Trusted staged hashes must survive targeted runs, while the report should not present old notebooks as part of the current command. Role and status live only in the ordered latest-run list; side effects also live only with that run. |
+| A staged notebook without a recorded hash, or whose hash changed, is refused unless `run --force` is explicit (2026-11-26) | Slice 1 staged files and user-edited staged files cannot safely be distinguished without state. The refusal explains the one-time upgrade friction. |
+| Slice 2A uses minimal state checks and no lock: parse JSON, check schema version and core containers; concurrent runs are unsupported and last writer wins (2026-11-26) | State is disposable local data. Atomic writes prevent corruption, and a later hash mismatch fails safely with `--force` instructions. |
+| Run side effects retain only path, created/modified/deleted kind and Git-tracked flag; ignored untracked files are omitted (2026-11-26) | Detection hashes are temporary implementation data, and omitting ignored files prevents `__pycache__/` noise. |
